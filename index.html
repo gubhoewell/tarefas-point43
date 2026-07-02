@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tarefas — Point 43</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #0f0f0f;
+    color: #f0f0f0;
+    min-height: 100vh;
+  }
+
+  /* ── TELA DE SELEÇÃO ── */
+  #tela-selecao {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 2rem;
+  }
+
+  .logo {
+    font-size: 13px;
+    letter-spacing: 0.15em;
+    color: #c9a84c;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+
+  .logo-titulo {
+    font-size: 22px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 2rem;
+  }
+
+  .grid-usuarios {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    max-width: 600px;
+    width: 100%;
+  }
+
+  .btn-usuario {
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    border-radius: 12px;
+    padding: 1.2rem 1rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: center;
+    color: #f0f0f0;
+  }
+
+  .btn-usuario:hover {
+    border-color: #c9a84c;
+    background: #1f1c14;
+  }
+
+  .btn-usuario .avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: #c9a84c22;
+    border: 1.5px solid #c9a84c55;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 16px;
+    color: #c9a84c;
+    margin: 0 auto 10px;
+  }
+
+  .btn-usuario .nome { font-size: 14px; font-weight: 500; }
+  .btn-usuario .cargo { font-size: 11px; color: #666; margin-top: 2px; }
+
+  /* ── APP PRINCIPAL ── */
+  #app { display: none; }
+
+  header {
+    background: #141414;
+    border-bottom: 1px solid #222;
+    padding: 0 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 56px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  .header-esq { display: flex; align-items: center; gap: 12px; }
+
+  .header-avatar {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: #c9a84c22;
+    border: 1.5px solid #c9a84c;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 12px; color: #c9a84c;
+  }
+
+  .header-nome { font-size: 14px; font-weight: 500; }
+  .header-cargo { font-size: 11px; color: #666; }
+
+  .btn-trocar {
+    background: none; border: 1px solid #2a2a2a;
+    color: #888; font-size: 12px;
+    padding: 6px 12px; border-radius: 6px; cursor: pointer;
+  }
+  .btn-trocar:hover { color: #f0f0f0; border-color: #444; }
+
+  /* ── TABS ── */
+  .tabs {
+    display: flex;
+    gap: 4px;
+    padding: 1rem 1.5rem 0;
+    border-bottom: 1px solid #222;
+    background: #141414;
+  }
+
+  .tab {
+    padding: 8px 16px;
+    font-size: 13px;
+    color: #666;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+    border-radius: 4px 4px 0 0;
+  }
+
+  .tab:hover { color: #f0f0f0; }
+  .tab.ativo { color: #c9a84c; border-bottom-color: #c9a84c; }
+
+  /* ── CONTEÚDO ── */
+  .conteudo { padding: 1.5rem; max-width: 900px; margin: 0 auto; }
+
+  /* ── BOTÃO NOVA TAREFA ── */
+  .btn-nova {
+    background: #c9a84c;
+    color: #000;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-bottom: 1.5rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .btn-nova:hover { background: #d4b05e; }
+
+  /* ── FILTROS ── */
+  .filtros {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 1.25rem;
+    flex-wrap: wrap;
+  }
+
+  .filtro-btn {
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    color: #888;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .filtro-btn:hover { border-color: #444; color: #f0f0f0; }
+  .filtro-btn.ativo { background: #1f1c14; border-color: #c9a84c; color: #c9a84c; }
+
+  /* ── CARDS DE TAREFA ── */
+  .lista-tarefas { display: flex; flex-direction: column; gap: 8px; }
+
+  .tarefa-card {
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    border-radius: 10px;
+    padding: 14px 16px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    transition: border-color 0.15s;
+  }
+
+  .tarefa-card:hover { border-color: #333; }
+  .tarefa-card.atrasada { border-left: 3px solid #e24b4a; }
+  .tarefa-card.concluida { opacity: 0.45; }
+  .tarefa-card.em-andamento { border-left: 3px solid #c9a84c; }
+
+  .tarefa-check {
+    width: 20px; height: 20px; min-width: 20px;
+    border-radius: 50%;
+    border: 1.5px solid #444;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    margin-top: 1px;
+    transition: all 0.15s;
+  }
+  .tarefa-check:hover { border-color: #c9a84c; }
+  .tarefa-check.concluida { background: #c9a84c; border-color: #c9a84c; }
+  .tarefa-check.concluida::after { content: '✓'; font-size: 11px; color: #000; font-weight: 700; }
+  .tarefa-check.em-andamento { border-color: #c9a84c; }
+  .tarefa-check.em-andamento::after { content: '▶'; font-size: 9px; color: #c9a84c; }
+
+  .tarefa-corpo { flex: 1; min-width: 0; }
+
+  .tarefa-titulo {
+    font-size: 14px;
+    font-weight: 500;
+    color: #f0f0f0;
+    margin-bottom: 6px;
+    line-height: 1.4;
+  }
+
+  .tarefa-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .tag {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-weight: 500;
+  }
+
+  .tag-data { background: #1e2a1e; color: #5a9e5a; }
+  .tag-data.atrasada { background: #2a1e1e; color: #e24b4a; }
+  .tag-data.hoje { background: #2a231a; color: #c9a84c; }
+  .tag-criado { background: #1e1e2a; color: #7777cc; }
+  .tag-responsavel { background: #1e2a2a; color: #5a9e9e; }
+
+  .tarefa-status-btn {
+    background: none;
+    border: 1px solid #2a2a2a;
+    color: #666;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .tarefa-status-btn:hover { border-color: #c9a84c; color: #c9a84c; }
+
+  .btn-excluir {
+    background: none; border: none;
+    color: #333; font-size: 16px;
+    cursor: pointer; padding: 2px 6px;
+    border-radius: 4px;
+    transition: color 0.15s;
+  }
+  .btn-excluir:hover { color: #e24b4a; }
+
+  .vazio {
+    text-align: center;
+    padding: 3rem;
+    color: #444;
+    font-size: 14px;
+  }
+
+  /* ── SEÇÃO VISÃO GERAL ── */
+  .pessoa-secao { margin-bottom: 2rem; }
+
+  .pessoa-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+    cursor: pointer;
+  }
+
+  .pessoa-avatar-sm {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: #c9a84c22;
+    border: 1px solid #c9a84c55;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; color: #c9a84c;
+  }
+
+  .pessoa-nome-header { font-size: 14px; font-weight: 600; color: #f0f0f0; }
+  .badge-contagem {
+    font-size: 11px; background: #2a2a2a;
+    color: #888; padding: 2px 8px;
+    border-radius: 20px;
+  }
+  .badge-atrasada { background: #2a1e1e; color: #e24b4a; }
+
+  /* ── MODAL ── */
+  .overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: #000000bb;
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+  }
+  .overlay.aberto { display: flex; }
+
+  .modal {
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    border-radius: 16px;
+    padding: 1.5rem;
+    width: 100%;
+    max-width: 480px;
+  }
+
+  .modal h2 { font-size: 16px; font-weight: 600; margin-bottom: 1.25rem; }
+
+  .campo { margin-bottom: 1rem; }
+  .campo label { font-size: 12px; color: #888; display: block; margin-bottom: 6px; }
+
+  .campo input, .campo select, .campo textarea {
+    width: 100%;
+    background: #111;
+    border: 1px solid #2a2a2a;
+    border-radius: 8px;
+    color: #f0f0f0;
+    font-size: 14px;
+    padding: 10px 12px;
+    outline: none;
+    font-family: inherit;
+  }
+
+  .campo input:focus, .campo select:focus, .campo textarea:focus {
+    border-color: #c9a84c;
+  }
+
+  .campo select option { background: #1a1a1a; }
+  .campo textarea { resize: vertical; min-height: 80px; }
+
+  .modal-btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1.25rem; }
+
+  .btn-cancelar {
+    background: none; border: 1px solid #2a2a2a;
+    color: #888; padding: 9px 18px;
+    border-radius: 8px; font-size: 13px; cursor: pointer;
+  }
+  .btn-cancelar:hover { border-color: #444; color: #f0f0f0; }
+
+  .btn-salvar {
+    background: #c9a84c; color: #000;
+    border: none; padding: 9px 18px;
+    border-radius: 8px; font-size: 13px;
+    font-weight: 600; cursor: pointer;
+  }
+  .btn-salvar:hover { background: #d4b05e; }
+
+  /* ── RESPONSIVO ── */
+  @media (max-width: 480px) {
+    .grid-usuarios { grid-template-columns: repeat(2, 1fr); }
+    .conteudo { padding: 1rem; }
+    .tabs { padding: 0.75rem 1rem 0; overflow-x: auto; }
+  }
+</style>
+</head>
+<body>
+
+<!-- TELA SELEÇÃO -->
+<div id="tela-selecao">
+  <div class="logo">POINT 43</div>
+  <div class="logo-titulo">Gestão de Tarefas</div>
+  <div class="grid-usuarios" id="grid-usuarios"></div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <header>
+    <div class="header-esq">
+      <div class="header-avatar" id="h-avatar"></div>
+      <div>
+        <div class="header-nome" id="h-nome"></div>
+        <div class="header-cargo" id="h-cargo"></div>
+      </div>
+    </div>
+    <button class="btn-trocar" onclick="trocarUsuario()">← Trocar</button>
+  </header>
+
+  <div class="tabs" id="tabs"></div>
+
+  <div class="conteudo" id="conteudo"></div>
+</div>
+
+<!-- MODAL NOVA TAREFA -->
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h2 id="modal-titulo">Nova Tarefa</h2>
+    <div class="campo">
+      <label>Descrição *</label>
+      <textarea id="f-descricao" placeholder="O que precisa ser feito?"></textarea>
+    </div>
+    <div class="campo">
+      <label>Responsável *</label>
+      <select id="f-responsavel"></select>
+    </div>
+    <div class="campo">
+      <label>Data de entrega *</label>
+      <input type="date" id="f-data">
+    </div>
+    <div class="modal-btns">
+      <button class="btn-cancelar" onclick="fecharModal()">Cancelar</button>
+      <button class="btn-salvar" onclick="salvarTarefa()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script>
+const FIREBASE_CONFIG = {
+  apiKey:            "AIzaSyDaqcz5zUxy1AYh7NEmh9-4wNwk9I627Es",
+  authDomain:        "point-43-arena-comercial.firebaseapp.com",
+  projectId:         "point-43-arena-comercial",
+  storageBucket:     "point-43-arena-comercial.firebasestorage.app",
+  messagingSenderId: "396529161590",
+  appId:             "1:396529161590:web:473d302e178d4f063fd657",
+  databaseURL:       "https://point-43-arena-comercial-default-rtdb.firebaseio.com",
+};
+
+firebase.initializeApp(FIREBASE_CONFIG);
+const DB = firebase.database();
+const REF = DB.ref('tarefas');
+
+const USUARIOS = [
+  { id: 'gustavo',  nome: 'Gustavo',  cargo: 'CEO',       gestor: true },
+  { id: 'mateus',   nome: 'Mateus',   cargo: 'COO',       gestor: true },
+  { id: 'bene',     nome: 'Bene',     cargo: 'CFO',       gestor: true },
+  { id: 'lucas',    nome: 'Lucas',    cargo: 'Expansão',  gestor: false },
+  { id: 'emilly',   nome: 'Emilly',   cargo: 'Backoffice',gestor: false },
+  { id: 'luana',    nome: 'Luana',    cargo: 'Backoffice',gestor: false },
+  { id: 'julia',    nome: 'Júlia',    cargo: 'Backoffice',gestor: false },
+  { id: 'raquel',   nome: 'Raquel',   cargo: 'Marketing', gestor: false },
+];
+
+let usuarioAtual = null;
+let tarefas = {};
+let tabAtiva = 'minhas';
+let filtroStatus = 'todas';
+
+function iniciais(nome) {
+  return nome.split(' ').map(p => p[0]).join('').slice(0,2).toUpperCase();
+}
+
+function usuario(id) {
+  return USUARIOS.find(u => u.id === id);
+}
+
+// ── SELEÇÃO DE USUÁRIO ──
+function renderSelecao() {
+  const grid = document.getElementById('grid-usuarios');
+  grid.innerHTML = USUARIOS.map(u => `
+    <div class="btn-usuario" onclick="entrar('${u.id}')">
+      <div class="avatar">${iniciais(u.nome)}</div>
+      <div class="nome">${u.nome}</div>
+      <div class="cargo">${u.cargo}</div>
+    </div>
+  `).join('');
+}
+
+function entrar(id) {
+  usuarioAtual = id;
+  localStorage.setItem('p43_usuario', id);
+  document.getElementById('tela-selecao').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  const u = usuario(id);
+  document.getElementById('h-avatar').textContent = iniciais(u.nome);
+  document.getElementById('h-nome').textContent = u.nome;
+  document.getElementById('h-cargo').textContent = u.cargo;
+  renderTabs();
+  escutarTarefas();
+}
+
+function trocarUsuario() {
+  localStorage.removeItem('p43_usuario');
+  usuarioAtual = null;
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('tela-selecao').style.display = 'flex';
+}
+
+// ── TABS ──
+function renderTabs() {
+  const u = usuario(usuarioAtual);
+  const tabs = [
+    { id: 'minhas', label: 'Minhas tarefas' },
+    ...(u.gestor ? [{ id: 'geral', label: 'Visão geral' }] : []),
+  ];
+  document.getElementById('tabs').innerHTML = tabs.map(t => `
+    <div class="tab ${tabAtiva === t.id ? 'ativo' : ''}" onclick="mudarTab('${t.id}')">${t.label}</div>
+  `).join('');
+}
+
+function mudarTab(id) {
+  tabAtiva = id;
+  renderTabs();
+  renderConteudo();
+}
+
+// ── FIREBASE ──
+function escutarTarefas() {
+  REF.on('value', snap => {
+    tarefas = snap.val() || {};
+    renderConteudo();
+  });
+}
+
+// ── RENDERIZAÇÃO ──
+function renderConteudo() {
+  if (tabAtiva === 'minhas') renderMinhas();
+  else renderGeral();
+}
+
+function renderMinhas() {
+  const todas = Object.entries(tarefas)
+    .map(([id, t]) => ({ id, ...t }))
+    .filter(t => t.responsavel === usuarioAtual);
+
+  let filtradas = todas;
+  if (filtroStatus === 'pendentes') filtradas = todas.filter(t => t.status !== 'concluida');
+  if (filtroStatus === 'andamento') filtradas = todas.filter(t => t.status === 'em-andamento');
+  if (filtroStatus === 'atrasadas') filtradas = todas.filter(t => isAtrasada(t));
+  if (filtroStatus === 'concluidas') filtradas = todas.filter(t => t.status === 'concluida');
+
+  filtradas.sort((a, b) => {
+    if (a.status === 'concluida' && b.status !== 'concluida') return 1;
+    if (b.status === 'concluida' && a.status !== 'concluida') return -1;
+    return new Date(a.data) - new Date(b.data);
+  });
+
+  const atrasadas = todas.filter(t => isAtrasada(t) && t.status !== 'concluida').length;
+
+  document.getElementById('conteudo').innerHTML = `
+    <button class="btn-nova" onclick="abrirModal()">+ Nova tarefa</button>
+    <div class="filtros">
+      <div class="filtro-btn ${filtroStatus==='todas'?'ativo':''}" onclick="setFiltro('todas')">Todas (${todas.length})</div>
+      <div class="filtro-btn ${filtroStatus==='pendentes'?'ativo':''}" onclick="setFiltro('pendentes')">Pendentes</div>
+      <div class="filtro-btn ${filtroStatus==='andamento'?'ativo':''}" onclick="setFiltro('andamento')">Em andamento</div>
+      ${atrasadas > 0 ? `<div class="filtro-btn ${filtroStatus==='atrasadas'?'ativo':''}" onclick="setFiltro('atrasadas')" style="color:#e24b4a;border-color:#e24b4a33">Atrasadas (${atrasadas})</div>` : ''}
+      <div class="filtro-btn ${filtroStatus==='concluidas'?'ativo':''}" onclick="setFiltro('concluidas')">Concluídas</div>
+    </div>
+    <div class="lista-tarefas">
+      ${filtradas.length === 0 ? '<div class="vazio">Nenhuma tarefa aqui 🎉</div>' : filtradas.map(t => cardTarefa(t, false)).join('')}
+    </div>
+  `;
+}
+
+function renderGeral() {
+  let html = `<button class="btn-nova" onclick="abrirModal()">+ Nova tarefa</button>`;
+
+  for (const u of USUARIOS) {
+    const lista = Object.entries(tarefas)
+      .map(([id, t]) => ({ id, ...t }))
+      .filter(t => t.responsavel === u.id && t.status !== 'concluida')
+      .sort((a, b) => new Date(a.data) - new Date(b.data));
+
+    const atrasadas = lista.filter(t => isAtrasada(t)).length;
+
+    html += `
+      <div class="pessoa-secao">
+        <div class="pessoa-header" onclick="entrar('${u.id}')">
+          <div class="pessoa-avatar-sm">${iniciais(u.nome)}</div>
+          <div class="pessoa-nome-header">${u.nome}</div>
+          <span class="badge-contagem">${lista.length} pendente${lista.length !== 1 ? 's' : ''}</span>
+          ${atrasadas > 0 ? `<span class="badge-contagem badge-atrasada">⚠ ${atrasadas} atrasada${atrasadas > 1 ? 's' : ''}</span>` : ''}
+        </div>
+        <div class="lista-tarefas">
+          ${lista.length === 0
+            ? '<div class="vazio" style="padding:1rem;font-size:13px">Em dia ✓</div>'
+            : lista.map(t => cardTarefa(t, true)).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  document.getElementById('conteudo').innerHTML = html;
+}
+
+function cardTarefa(t, mostrarResponsavel) {
+  const atrasada = isAtrasada(t) && t.status !== 'concluida';
+  const hoje = t.data === new Date().toISOString().split('T')[0] && t.status !== 'concluida';
+  const criador = usuario(t.criadoPor);
+  const resp = usuario(t.responsavel);
+
+  let classCard = 'tarefa-card';
+  if (t.status === 'concluida') classCard += ' concluida';
+  else if (atrasada) classCard += ' atrasada';
+  else if (t.status === 'em-andamento') classCard += ' em-andamento';
+
+  const dataLabel = formatarData(t.data);
+
+  return `
+    <div class="${classCard}" id="card-${t.id}">
+      <div class="tarefa-check ${t.status === 'concluida' ? 'concluida' : t.status === 'em-andamento' ? 'em-andamento' : ''}"
+           onclick="ciclarStatus('${t.id}','${t.status||'a-fazer'}')"></div>
+      <div class="tarefa-corpo">
+        <div class="tarefa-titulo">${t.descricao}</div>
+        <div class="tarefa-meta">
+          <span class="tag tag-data ${atrasada ? 'atrasada' : hoje ? 'hoje' : ''}">
+            ${atrasada ? '⚠ ' : hoje ? '⏰ ' : '📅 '}${dataLabel}
+          </span>
+          ${mostrarResponsavel && resp ? `<span class="tag tag-responsavel">→ ${resp.nome}</span>` : ''}
+          ${criador && criador.id !== t.responsavel ? `<span class="tag tag-criado">por ${criador.nome}</span>` : ''}
+          ${t.status === 'a-fazer' || !t.status ? `<button class="tarefa-status-btn" onclick="setStatus('${t.id}','em-andamento')">Iniciar</button>` : ''}
+          ${t.status === 'em-andamento' ? `<button class="tarefa-status-btn" onclick="setStatus('${t.id}','concluida')">Concluir</button>` : ''}
+        </div>
+      </div>
+      ${podeExcluir(t) ? `<button class="btn-excluir" onclick="excluir('${t.id}')">×</button>` : ''}
+    </div>
+  `;
+}
+
+// ── LÓGICA ──
+function isAtrasada(t) {
+  if (!t.data || t.status === 'concluida') return false;
+  return t.data < new Date().toISOString().split('T')[0];
+}
+
+function podeExcluir(t) {
+  return t.criadoPor === usuarioAtual || usuarioAtual === 'gustavo';
+}
+
+function formatarData(data) {
+  if (!data) return '';
+  const [ano, mes, dia] = data.split('-');
+  return `${dia}/${mes}`;
+}
+
+function setFiltro(f) {
+  filtroStatus = f;
+  renderConteudo();
+}
+
+function ciclarStatus(id, statusAtual) {
+  const ciclo = { 'a-fazer': 'em-andamento', 'em-andamento': 'concluida', 'concluida': 'a-fazer' };
+  const proximo = ciclo[statusAtual] || 'em-andamento';
+  REF.child(id).update({ status: proximo });
+}
+
+function setStatus(id, status) {
+  REF.child(id).update({ status });
+}
+
+function excluir(id) {
+  if (confirm('Excluir esta tarefa?')) REF.child(id).remove();
+}
+
+// ── MODAL ──
+function abrirModal(respId) {
+  document.getElementById('f-descricao').value = '';
+  document.getElementById('f-data').value = '';
+
+  const sel = document.getElementById('f-responsavel');
+  sel.innerHTML = USUARIOS.map(u =>
+    `<option value="${u.id}" ${(respId || usuarioAtual) === u.id ? 'selected' : ''}>${u.nome} — ${u.cargo}</option>`
+  ).join('');
+
+  document.getElementById('overlay').classList.add('aberto');
+  document.getElementById('f-descricao').focus();
+}
+
+function fecharModal() {
+  document.getElementById('overlay').classList.remove('aberto');
+}
+
+function salvarTarefa() {
+  const descricao = document.getElementById('f-descricao').value.trim();
+  const responsavel = document.getElementById('f-responsavel').value;
+  const data = document.getElementById('f-data').value;
+
+  if (!descricao) { alert('Descreva a tarefa.'); return; }
+  if (!data) { alert('Informe a data de entrega.'); return; }
+
+  REF.push({
+    descricao,
+    responsavel,
+    criadoPor: usuarioAtual,
+    data,
+    status: 'a-fazer',
+    criadoEm: Date.now(),
+  });
+
+  fecharModal();
+}
+
+// ── INIT ──
+renderSelecao();
+
+const salvo = localStorage.getItem('p43_usuario');
+if (salvo && USUARIOS.find(u => u.id === salvo)) entrar(salvo);
+
+document.getElementById('overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('overlay')) fecharModal();
+});
+</script>
+</body>
+</html>

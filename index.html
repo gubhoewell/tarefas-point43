@@ -597,6 +597,8 @@ function cardTarefa(t, mostrarResponsavel) {
   const hoje = t.data === new Date().toISOString().split('T')[0] && t.status !== 'concluida';
   const criador = usuario(t.criadoPor);
   const resp = usuario(t.responsavel);
+  const isCeo = usuarioAtual === 'gustavo';
+  const isDono = t.responsavel === usuarioAtual;
 
   let classCard = 'tarefa-card';
   if (t.status === 'concluida') classCard += ' concluida';
@@ -604,11 +606,12 @@ function cardTarefa(t, mostrarResponsavel) {
   else if (t.status === 'em-andamento') classCard += ' em-andamento';
 
   const dataLabel = formatarData(t.data);
+  const podeMudarStatus = isDono || isCeo;
 
   return `
     <div class="${classCard}" id="card-${t.id}">
       <div class="tarefa-check ${t.status === 'concluida' ? 'concluida' : t.status === 'em-andamento' ? 'em-andamento' : ''}"
-           onclick="ciclarStatus('${t.id}','${t.status||'a-fazer'}')"></div>
+           onclick="${podeMudarStatus ? `ciclarStatus('${t.id}','${t.status||'a-fazer'}')` : ''}"></div>
       <div class="tarefa-corpo">
         <div class="tarefa-titulo">${t.descricao}</div>
         <div class="tarefa-meta">
@@ -616,12 +619,16 @@ function cardTarefa(t, mostrarResponsavel) {
             ${atrasada ? '⚠ ' : hoje ? '⏰ ' : '📅 '}${dataLabel}
           </span>
           ${mostrarResponsavel && resp ? `<span class="tag tag-responsavel">→ ${resp.nome}</span>` : ''}
-          ${criador && criador.id !== t.responsavel ? `<span class="tag tag-criado">por ${criador.nome}</span>` : ''}
-          ${t.status === 'a-fazer' || !t.status ? `<button class="tarefa-status-btn" onclick="setStatus('${t.id}','em-andamento')">Iniciar</button>` : ''}
-          ${t.status === 'em-andamento' ? `<button class="tarefa-status-btn" onclick="setStatus('${t.id}','concluida')">Concluir</button>` : ''}
+          <span class="tag tag-criado">${criador && criador.id !== t.responsavel ? `por ${criador.nome}` : 'própria'}</span>
+          ${podeMudarStatus && (t.status === 'a-fazer' || !t.status) ? `<button class="tarefa-status-btn" onclick="setStatus('${t.id}','em-andamento')">Iniciar</button>` : ''}
+          ${podeMudarStatus && t.status === 'em-andamento' ? `<button class="tarefa-status-btn" onclick="setStatus('${t.id}','concluida')">Concluir</button>` : ''}
+          ${isCeo && t.status === 'concluida' ? `<button class="tarefa-status-btn" onclick="setStatus('${t.id}','a-fazer')">Reabrir</button>` : ''}
         </div>
       </div>
-      ${podeExcluir(t) ? `<button class="btn-excluir" onclick="excluir('${t.id}')">×</button>` : ''}
+      <div style="display:flex;gap:4px;align-items:center">
+        ${isCeo ? `<button class="btn-excluir" title="Editar" onclick="abrirEdicao('${t.id}')">✎</button>` : ''}
+        ${podeExcluir(t) ? `<button class="btn-excluir" onclick="excluir('${t.id}')">×</button>` : ''}
+      </div>
     </div>
   `;
 }
@@ -634,6 +641,23 @@ function isAtrasada(t) {
 
 function podeExcluir(t) {
   return t.criadoPor === usuarioAtual || usuarioAtual === 'gustavo';
+}
+
+let editandoId = null;
+
+function abrirEdicao(id) {
+  const t = tarefas[id];
+  if (!t) return;
+  editandoId = id;
+  document.getElementById('modal-titulo').textContent = 'Editar Tarefa';
+  document.getElementById('f-descricao').value = t.descricao;
+  document.getElementById('f-data').value = t.data;
+  const sel = document.getElementById('f-responsavel');
+  sel.innerHTML = USUARIOS.map(u =>
+    `<option value="${u.id}" ${t.responsavel === u.id ? 'selected' : ''}>${u.nome} — ${u.cargo}</option>`
+  ).join('');
+  document.getElementById('overlay').classList.add('aberto');
+  document.getElementById('f-descricao').focus();
 }
 
 function formatarData(data) {
@@ -663,6 +687,8 @@ function excluir(id) {
 
 // ── MODAL ──
 function abrirModal(respId) {
+  editandoId = null;
+  document.getElementById('modal-titulo').textContent = 'Nova Tarefa';
   document.getElementById('f-descricao').value = '';
   document.getElementById('f-data').value = '';
 
@@ -676,6 +702,7 @@ function abrirModal(respId) {
 }
 
 function fecharModal() {
+  editandoId = null;
   document.getElementById('overlay').classList.remove('aberto');
 }
 
@@ -687,14 +714,16 @@ function salvarTarefa() {
   if (!descricao) { alert('Descreva a tarefa.'); return; }
   if (!data) { alert('Informe a data de entrega.'); return; }
 
-  REF.push({
-    descricao,
-    responsavel,
-    criadoPor: usuarioAtual,
-    data,
-    status: 'a-fazer',
-    criadoEm: Date.now(),
-  });
+  if (editandoId) {
+    REF.child(editandoId).update({ descricao, responsavel, data });
+  } else {
+    REF.push({
+      descricao, responsavel,
+      criadoPor: usuarioAtual,
+      data, status: 'a-fazer',
+      criadoEm: Date.now(),
+    });
+  }
 
   fecharModal();
 }

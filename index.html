@@ -200,6 +200,8 @@
   .tarefa-card.atrasada { border-left: 3px solid #e24b4a; }
   .tarefa-card.concluida { opacity: 0.45; }
   .tarefa-card.em-andamento { border-left: 3px solid #c9a84c; }
+  .tarefa-card.aguardando { border-left: 3px solid #7777cc; background: #1a1a2a; }
+  .tarefa-card.devolvida { border-left: 3px solid #e2874a; background: #1e1a14; }
 
   .tarefa-check {
     width: 20px; height: 20px; min-width: 20px;
@@ -245,6 +247,29 @@
   .tag-data.hoje { background: #2a231a; color: #c9a84c; }
   .tag-criado { background: #1e1e2a; color: #7777cc; }
   .tag-responsavel { background: #1e2a2a; color: #5a9e9e; }
+  .tag-aguardando { background: #1e1e2a; color: #9999ee; font-weight: 600; }
+  .tag-devolvida { background: #2a1e10; color: #e2874a; font-weight: 600; }
+
+  .btn-aceitar {
+    background: #1e2a1e; border: 1px solid #5a9e5a;
+    color: #5a9e5a; font-size: 13px;
+    padding: 4px 12px; border-radius: 4px; cursor: pointer;
+  }
+  .btn-aceitar:hover { background: #5a9e5a; color: #000; }
+
+  .btn-recusar {
+    background: none; border: 1px solid #444;
+    color: #888; font-size: 13px;
+    padding: 4px 12px; border-radius: 4px; cursor: pointer;
+  }
+  .btn-recusar:hover { border-color: #e24b4a; color: #e24b4a; }
+
+  .badge-notif {
+    background: #7777cc; color: #fff;
+    font-size: 11px; font-weight: 700;
+    padding: 1px 6px; border-radius: 10px;
+    margin-left: 4px;
+  }
 
   .tarefa-status-btn {
     background: none;
@@ -496,10 +521,18 @@ function trocarUsuario() {
 }
 
 // ── TABS ──
+function contarAguardando() {
+  return Object.values(tarefas).filter(t =>
+    t.responsavel === usuarioAtual && t.status === 'aguardando-aceite'
+  ).length;
+}
+
 function renderTabs() {
   const u = usuario(usuarioAtual);
+  const pendentes = contarAguardando();
+  const badge = pendentes > 0 ? `<span class="badge-notif">${pendentes}</span>` : '';
   const tabs = [
-    { id: 'minhas', label: 'Minhas tarefas' },
+    { id: 'minhas', label: `Minhas tarefas${badge}` },
     ...(u.gestor ? [{ id: 'geral', label: 'Visão geral' }] : []),
   ];
   document.getElementById('tabs').innerHTML = tabs.map(t => `
@@ -528,28 +561,41 @@ function renderConteudo() {
 }
 
 function renderMinhas() {
-  const todas = Object.entries(tarefas)
+  // tarefas onde sou responsável OU que me foram devolvidas (criadoPor = eu, status devolvida)
+  const minhas = Object.entries(tarefas)
     .map(([id, t]) => ({ id, ...t }))
-    .filter(t => t.responsavel === usuarioAtual);
+    .filter(t => t.responsavel === usuarioAtual || (t.criadoPor === usuarioAtual && t.status === 'devolvida'));
+
+  // deduplicar (caso seja responsável E criador)
+  const vistas = new Set();
+  const todas = minhas.filter(t => { if (vistas.has(t.id)) return false; vistas.add(t.id); return true; });
 
   let filtradas = todas;
-  if (filtroStatus === 'pendentes') filtradas = todas.filter(t => t.status !== 'concluida');
-  if (filtroStatus === 'andamento') filtradas = todas.filter(t => t.status === 'em-andamento');
-  if (filtroStatus === 'atrasadas') filtradas = todas.filter(t => isAtrasada(t));
-  if (filtroStatus === 'concluidas') filtradas = todas.filter(t => t.status === 'concluida');
+  if (filtroStatus === 'pendentes')   filtradas = todas.filter(t => !['concluida','aguardando-aceite'].includes(t.status));
+  if (filtroStatus === 'andamento')   filtradas = todas.filter(t => t.status === 'em-andamento');
+  if (filtroStatus === 'atrasadas')   filtradas = todas.filter(t => isAtrasada(t));
+  if (filtroStatus === 'concluidas')  filtradas = todas.filter(t => t.status === 'concluida');
+  if (filtroStatus === 'aguardando')  filtradas = todas.filter(t => t.status === 'aguardando-aceite');
+  if (filtroStatus === 'devolvidas')  filtradas = todas.filter(t => t.status === 'devolvida');
 
   filtradas.sort((a, b) => {
-    if (a.status === 'concluida' && b.status !== 'concluida') return 1;
-    if (b.status === 'concluida' && a.status !== 'concluida') return -1;
+    const ordem = { 'aguardando-aceite': 0, 'devolvida': 1, 'a-fazer': 2, 'em-andamento': 3, 'concluida': 4 };
+    const oa = ordem[a.status] ?? 2;
+    const ob = ordem[b.status] ?? 2;
+    if (oa !== ob) return oa - ob;
     return new Date(a.data) - new Date(b.data);
   });
 
-  const atrasadas = todas.filter(t => isAtrasada(t) && t.status !== 'concluida').length;
+  const aguardando = todas.filter(t => t.status === 'aguardando-aceite').length;
+  const devolvidas = todas.filter(t => t.status === 'devolvida').length;
+  const atrasadas = todas.filter(t => isAtrasada(t) && !['concluida','aguardando-aceite'].includes(t.status)).length;
 
   document.getElementById('conteudo').innerHTML = `
     <button class="btn-nova" onclick="abrirModal()">+ Nova tarefa</button>
     <div class="filtros">
       <div class="filtro-btn ${filtroStatus==='todas'?'ativo':''}" onclick="setFiltro('todas')">Todas (${todas.length})</div>
+      ${aguardando > 0 ? `<div class="filtro-btn ${filtroStatus==='aguardando'?'ativo':''}" onclick="setFiltro('aguardando')" style="color:#9999ee;border-color:#7777cc55">⏳ Aguardando (${aguardando})</div>` : ''}
+      ${devolvidas > 0 ? `<div class="filtro-btn ${filtroStatus==='devolvidas'?'ativo':''}" onclick="setFiltro('devolvidas')" style="color:#e2874a;border-color:#e2874a55">↩ Devolvidas (${devolvidas})</div>` : ''}
       <div class="filtro-btn ${filtroStatus==='pendentes'?'ativo':''}" onclick="setFiltro('pendentes')">Pendentes</div>
       <div class="filtro-btn ${filtroStatus==='andamento'?'ativo':''}" onclick="setFiltro('andamento')">Em andamento</div>
       ${atrasadas > 0 ? `<div class="filtro-btn ${filtroStatus==='atrasadas'?'ativo':''}" onclick="setFiltro('atrasadas')" style="color:#e24b4a;border-color:#e24b4a33">Atrasadas (${atrasadas})</div>` : ''}
@@ -593,33 +639,43 @@ function renderGeral() {
 }
 
 function cardTarefa(t, mostrarResponsavel) {
-  const atrasada = isAtrasada(t) && t.status !== 'concluida';
+  const atrasada = isAtrasada(t) && !['concluida','aguardando-aceite'].includes(t.status);
   const hoje = t.data === new Date().toISOString().split('T')[0] && t.status !== 'concluida';
   const criador = usuario(t.criadoPor);
   const resp = usuario(t.responsavel);
   const isCeo = usuarioAtual === 'gustavo';
   const isDono = t.responsavel === usuarioAtual;
+  const isAguardando = t.status === 'aguardando-aceite';
+  const isDevolvida = t.status === 'devolvida';
 
   let classCard = 'tarefa-card';
   if (t.status === 'concluida') classCard += ' concluida';
+  else if (isAguardando) classCard += ' aguardando';
+  else if (isDevolvida) classCard += ' devolvida';
   else if (atrasada) classCard += ' atrasada';
   else if (t.status === 'em-andamento') classCard += ' em-andamento';
 
   const dataLabel = formatarData(t.data);
   const podeMudarStatus = isDono || isCeo;
+  const checkClass = t.status === 'concluida' ? 'concluida' : t.status === 'em-andamento' ? 'em-andamento' : '';
+  const podeCheck = podeMudarStatus && !isAguardando && !isDevolvida;
 
   return `
     <div class="${classCard}" id="card-${t.id}">
-      <div class="tarefa-check ${t.status === 'concluida' ? 'concluida' : t.status === 'em-andamento' ? 'em-andamento' : ''}"
-           onclick="${podeMudarStatus ? `ciclarStatus('${t.id}','${t.status||'a-fazer'}')` : ''}"></div>
+      <div class="tarefa-check ${checkClass}"
+           onclick="${podeCheck ? `ciclarStatus('${t.id}','${t.status||'a-fazer'}')` : ''}"></div>
       <div class="tarefa-corpo">
         <div class="tarefa-titulo">${t.descricao}</div>
         <div class="tarefa-meta">
+          ${isAguardando ? `<span class="tag tag-aguardando">⏳ Aguardando aceite</span>` : ''}
+          ${isDevolvida ? `<span class="tag tag-devolvida">↩ Devolvida${resp ? ' por ' + resp.nome : ''}</span>` : ''}
           <span class="tag tag-data ${atrasada ? 'atrasada' : hoje ? 'hoje' : ''}">
             ${atrasada ? '⚠ ' : hoje ? '⏰ ' : '📅 '}${dataLabel}
           </span>
           ${mostrarResponsavel && resp ? `<span class="tag tag-responsavel">→ ${resp.nome}</span>` : ''}
           <span class="tag tag-criado">${criador && criador.id !== t.responsavel ? `por ${criador.nome}` : 'própria'}</span>
+          ${isAguardando && isDono ? `<button class="btn-aceitar" onclick="aceitarTarefa('${t.id}')">Aceitar</button><button class="btn-recusar" onclick="recusarTarefa('${t.id}')">Recusar</button>` : ''}
+          ${isDevolvida && t.criadoPor === usuarioAtual ? `<button class="tarefa-status-btn" onclick="abrirEdicao('${t.id}')">Reatribuir</button><button class="tarefa-status-btn" onclick="setStatus('${t.id}','a-fazer')">Assumir</button>` : ''}
           ${podeMudarStatus && (t.status === 'a-fazer' || !t.status) ? `<button class="tarefa-status-btn" onclick="setStatus('${t.id}','em-andamento')">Iniciar</button>` : ''}
           ${podeMudarStatus && t.status === 'em-andamento' ? `<button class="tarefa-status-btn" onclick="setStatus('${t.id}','concluida')">Concluir</button>` : ''}
           ${isCeo && t.status === 'concluida' ? `<button class="tarefa-status-btn" onclick="setStatus('${t.id}','a-fazer')">Reabrir</button>` : ''}
@@ -671,6 +727,16 @@ function setFiltro(f) {
   renderConteudo();
 }
 
+function aceitarTarefa(id) {
+  REF.child(id).update({ status: 'a-fazer' });
+}
+
+function recusarTarefa(id) {
+  const t = tarefas[id];
+  if (!t) return;
+  REF.child(id).update({ responsavel: t.criadoPor, status: 'devolvida' });
+}
+
 function ciclarStatus(id, statusAtual) {
   const ciclo = { 'a-fazer': 'em-andamento', 'em-andamento': 'concluida', 'concluida': 'a-fazer' };
   const proximo = ciclo[statusAtual] || 'em-andamento';
@@ -715,14 +781,14 @@ function salvarTarefa() {
   if (!data) { alert('Informe a data de entrega.'); return; }
 
   if (editandoId) {
-    REF.child(editandoId).update({ descricao, responsavel, data });
+    const t = tarefas[editandoId];
+    const mudouResponsavel = t && t.responsavel !== responsavel;
+    const update = { descricao, responsavel, data };
+    if (mudouResponsavel) update.status = responsavel === usuarioAtual ? 'a-fazer' : 'aguardando-aceite';
+    REF.child(editandoId).update(update);
   } else {
-    REF.push({
-      descricao, responsavel,
-      criadoPor: usuarioAtual,
-      data, status: 'a-fazer',
-      criadoEm: Date.now(),
-    });
+    const status = responsavel === usuarioAtual ? 'a-fazer' : 'aguardando-aceite';
+    REF.push({ descricao, responsavel, criadoPor: usuarioAtual, data, status, criadoEm: Date.now() });
   }
 
   fecharModal();

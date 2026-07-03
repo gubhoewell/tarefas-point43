@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Seed Tarefas — Point 43</title>
+<style>
+  body { font-family: monospace; background: #0f0f0f; color: #f0f0f0; padding: 2rem; }
+  #log { white-space: pre-wrap; font-size: 14px; line-height: 1.6; }
+  .ok  { color: #5a9e5a; }
+  .err { color: #e24b4a; }
+  .info{ color: #c9a84c; }
+</style>
+</head>
+<body>
+<div id="log"><span class="info">Iniciando seed das tarefas...</span>
+</div>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script>
+firebase.initializeApp({
+  apiKey: "AIzaSyCopQnYtHCog6SsjxqnVu2PR7L7VcbF4Yw",
+  authDomain: "point-43-tarefas.firebaseapp.com",
+  databaseURL: "https://point-43-tarefas-default-rtdb.firebaseio.com",
+});
+const DB = firebase.database();
+const REF = DB.ref('tarefas');
+const log = document.getElementById('log');
+
+function linha(txt, cls) {
+  const s = document.createElement('span');
+  s.className = cls || '';
+  s.textContent = txt + '\n';
+  log.appendChild(s);
+}
+
+const TAREFAS = [
+  // ── SÓCIOS 15/06 ──
+  { descricao: 'Verificar disponibilidade para stand no BT200 (Arapongas)', responsavel: 'gustavo', criadoPor: 'gustavo', data: '2026-06-22' },
+  { descricao: 'Criar manual de processos + treinar equipe (vendas, estoque, bar)', responsavel: 'gustavo', criadoPor: 'gustavo', data: '2026-06-30' },
+  { descricao: 'Solicitar ao Leo que Demicon realize pagamento da estrutura das quadras', responsavel: 'gustavo', criadoPor: 'gustavo', data: '2026-06-20' },
+  { descricao: 'Enviar contrato de credenciamento no grupo', responsavel: 'gustavo', criadoPor: 'gustavo', data: '2026-06-20' },
+  { descricao: 'Negociar com Diego — propor acerto baseado nos R$4.000 recebidos', responsavel: 'gustavo', criadoPor: 'gustavo', data: '2026-06-30' },
+  { descricao: 'Dar feedback para Gabriel — expectativas profissionais e resultados necessários', responsavel: 'bene', criadoPor: 'gustavo', data: '2026-06-20' },
+  { descricao: 'Verificar CNPJ ativo de todos os credenciados', responsavel: 'bene', criadoPor: 'gustavo', data: '2026-06-25' },
+  { descricao: 'Encaminhar contrato WellHub para Gustavo', responsavel: 'bene', criadoPor: 'gustavo', data: '2026-06-20' },
+  { descricao: 'Compilar lista de necessidades estruturais para Rafa executar esta semana', responsavel: 'mateus', criadoPor: 'gustavo', data: '2026-06-20' },
+  { descricao: 'Analisar lista de espera + resultados da pesquisa de satisfação com feedback dos professores', responsavel: 'mateus', criadoPor: 'gustavo', data: '2026-06-25' },
+
+  // ── BACKOFFICE 15/06 ──
+  { descricao: 'Enviar feedbacks individuais — revisar histórico de atendimento de cada uma', responsavel: 'gustavo', criadoPor: 'gustavo', data: '2026-06-20' },
+  { descricao: 'Contatar participantes do bolão — interação + pedir indicações', responsavel: 'julia', criadoPor: 'gustavo', data: '2026-06-20' },
+  { descricao: 'Encaminhar dados dos leads pendentes para a Luana', responsavel: 'emilly', criadoPor: 'gustavo', data: '2026-06-18' },
+  { descricao: 'Instalar bandeiras decorativas — coordenar com Mateus ou William (falta escada)', responsavel: 'mateus', criadoPor: 'gustavo', data: '2026-06-25' },
+
+  // ── BACKOFFICE 16/06 ──
+  { descricao: 'Adicionar link do grupo do Bar na lista de pendências do grupo de backoffice', responsavel: 'gustavo', criadoPor: 'gustavo', data: '2026-06-18' },
+  { descricao: 'Ajustar regras de prorrogação de créditos e desconto de família no material de treinamento', responsavel: 'julia', criadoPor: 'gustavo', data: '2026-06-20' },
+  { descricao: 'Confirmar presença no evento de Arapongas na sexta (com Gabriel)', responsavel: 'julia', criadoPor: 'gustavo', data: '2026-06-17' },
+  { descricao: 'Confirmar presença no evento de Arapongas na quinta-feira', responsavel: 'emilly', criadoPor: 'gustavo', data: '2026-06-17' },
+
+  // ── SÓCIOS 22/06 ──
+  { descricao: 'Comunicar Leo: enviar metragem e custo do sombrite para viabilizar orçamento completo', responsavel: 'gustavo', criadoPor: 'gustavo', data: '2026-06-23' },
+  { descricao: 'Desenvolver projeto arquitetônico simplificado do bar + área infantil + pet — enviar para Vittor', responsavel: 'gustavo', criadoPor: 'gustavo', data: '2026-06-22' },
+  { descricao: 'Cobrar Raquel: marcar no grupo para envio da arte em alta definição', responsavel: 'gustavo', criadoPor: 'gustavo', data: '2026-06-25' },
+  { descricao: 'Consultar Rafa sobre profissional para instalação/manutenção de banners de patrocínio', responsavel: 'gustavo', criadoPor: 'gustavo', data: '2026-06-25' },
+  { descricao: 'Buscar organizador de eventos para torneio de setembro', responsavel: 'gustavo', criadoPor: 'gustavo', data: '2026-07-10' },
+  { descricao: 'Notificar Vittor: mudança de escopo — bar de alvenaria, sem areia', responsavel: 'mateus', criadoPor: 'gustavo', data: '2026-06-23' },
+  { descricao: 'Alinhar proposta com Vittor: bar + espaço infantil + parceria pet + corda naval', responsavel: 'mateus', criadoPor: 'gustavo', data: '2026-06-25' },
+  { descricao: 'Buscar organizador de eventos (junto com Gustavo)', responsavel: 'mateus', criadoPor: 'gustavo', data: '2026-07-10' },
+  { descricao: 'Encaminhar contato da serralheria + medidas para Leo', responsavel: 'bene', criadoPor: 'gustavo', data: '2026-06-23' },
+  { descricao: 'Questionar Pipet: plataforma de inscrição e custos para participantes', responsavel: 'bene', criadoPor: 'gustavo', data: '2026-06-25' },
+  { descricao: 'Orientar William: enviar lista de tarefas semanais (rastelagem + limpeza) para grupo de manutenção', responsavel: 'bene', criadoPor: 'gustavo', data: '2026-06-23' },
+  { descricao: 'Lançar informações financeiras do E Hub no sistema', responsavel: 'bene', criadoPor: 'gustavo', data: '2026-06-25' },
+  { descricao: 'Fotografar espaço atual das quadras para mockup/simulação para investidores', responsavel: 'bene', criadoPor: 'gustavo', data: '2026-06-25' },
+  { descricao: 'Cobrar Raquel sobre arte do patrocínio em alta definição', responsavel: 'raquel', criadoPor: 'gustavo', data: '2026-06-25' },
+
+  // ── SÓCIOS 30/06 ──
+  { descricao: 'Perguntar ao Leo qual valor disponível para investimento', responsavel: 'gustavo', criadoPor: 'gustavo', data: '2026-07-03' },
+  { descricao: 'Definir parâmetros do projeto piloto da liga com Gabriel', responsavel: 'gustavo', criadoPor: 'gustavo', data: '2026-07-07' },
+  { descricao: 'Visitar local pela manhã — conversar com William e prestador sobre manutenção pendente', responsavel: 'gustavo', criadoPor: 'gustavo', data: '2026-07-03' },
+  { descricao: 'Criar 3 cenários de negociação formatados para Mateus usar com Vittor', responsavel: 'gustavo', criadoPor: 'gustavo', data: '2026-07-01' },
+  { descricao: 'Contatar Diego — finalizar pendência', responsavel: 'gustavo', criadoPor: 'gustavo', data: '2026-07-05' },
+  { descricao: 'Consultar Jamile sobre torneio corporativo', responsavel: 'mateus', criadoPor: 'gustavo', data: '2026-07-03' },
+  { descricao: 'Reunião com Vittor à noite — negociar espaço e contrato', responsavel: 'mateus', criadoPor: 'gustavo', data: '2026-06-30' },
+  { descricao: 'Organizar e divulgar lista de treinamento dos professores (quinta-feira)', responsavel: 'mateus', criadoPor: 'gustavo', data: '2026-07-02' },
+  { descricao: 'Instalar alarme de segurança na recepção (R$890)', responsavel: 'bene', criadoPor: 'gustavo', data: '2026-07-07' },
+  { descricao: 'Conversar com Emily — saúde, bem-estar e recorrência de atestados', responsavel: 'bene', criadoPor: 'gustavo', data: '2026-07-03' },
+  { descricao: 'Analisar aspectos jurídicos — contrato atual, rescisão e cláusula de não competitividade com Vittor', responsavel: 'bene', criadoPor: 'gustavo', data: '2026-07-05' },
+
+  // ── BACKOFFICE COMERCIAL 01/07 ──
+  { descricao: 'Compartilhar POP em HTML com o time', responsavel: 'gustavo', criadoPor: 'gustavo', data: '2026-07-03' },
+  { descricao: 'Corrigir erro de visualização dos FitCoins no painel Game Arena', responsavel: 'gustavo', criadoPor: 'gustavo', data: '2026-07-04' },
+  { descricao: 'Zerar bônus indevido da Emily (mês de teste) no painel Game Arena', responsavel: 'gustavo', criadoPor: 'gustavo', data: '2026-07-04' },
+  { descricao: 'Simplificar dashboard Game Arena — remover campos individuais, manter só total do dia', responsavel: 'gustavo', criadoPor: 'gustavo', data: '2026-07-07' },
+  { descricao: 'Informar data exata de retorno das férias para ajuste de metas', responsavel: 'emilly', criadoPor: 'gustavo', data: '2026-07-05' },
+];
+
+async function seed() {
+  linha('Limpando dados anteriores...', 'info');
+  try {
+    await REF.remove();
+    linha('Banco limpo. Inserindo ' + TAREFAS.length + ' tarefas...', 'info');
+  } catch(e) {
+    linha('ERRO ao limpar: ' + e.message, 'err');
+    return;
+  }
+
+  let ok = 0;
+  for (const t of TAREFAS) {
+    try {
+      await REF.push({ ...t, status: 'a-fazer', criadoEm: Date.now() });
+      ok++;
+      linha(`✓ [${ok}/${TAREFAS.length}] ${t.responsavel}: ${t.descricao.slice(0, 60)}...`, 'ok');
+    } catch(e) {
+      linha(`✗ ERRO: ${t.descricao.slice(0,50)} — ${e.message}`, 'err');
+    }
+  }
+  linha('', '');
+  linha(`══ Concluído: ${ok}/${TAREFAS.length} tarefas inseridas. ══`, 'info');
+  if (ok === TAREFAS.length) {
+    linha('Pode fechar esta aba e abrir o sistema de tarefas!', 'ok');
+  }
+}
+
+seed();
+</script>
+</body>
+</html>

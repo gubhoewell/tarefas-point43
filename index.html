@@ -630,7 +630,11 @@ function renderMinhas() {
 }
 
 function renderGeral() {
+  const totalConcluidas = Object.values(tarefas).filter(t => t.status === 'concluida').length;
   let html = `<button class="btn-nova" onclick="abrirModal()">+ Nova tarefa</button>`;
+  if (usuarioAtual === 'gustavo' && totalConcluidas > 0) {
+    html += `<button class="btn-limpar" onclick="limparConcluidas()">🗑 Limpar concluídas (${totalConcluidas})</button>`;
+  }
 
   for (const u of USUARIOS) {
     const lista = Object.entries(tarefas)
@@ -750,7 +754,7 @@ function setFiltro(f) {
 }
 
 function limparConcluidas() {
-  if (!confirm('Apagar todas as tarefas concluídas?')) return;
+  if (!confirm('Apagar todas as tarefas concluídas do sistema?')) return;
   Object.entries(tarefas).forEach(([id, t]) => {
     if (t.status === 'concluida') REF.child(id).remove();
   });

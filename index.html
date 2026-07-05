@@ -199,6 +199,8 @@
   .tarefa-card:hover { border-color: #333; }
   .tarefa-card.atrasada { border-left: 3px solid #e24b4a; }
   .tarefa-card.concluida { opacity: 0.45; }
+  .tarefa-card.concluida:hover { opacity: 0.75; }
+  .tarefa-card.concluida .btn-excluir { opacity: 1; color: #666; }
   .tarefa-card.em-andamento { border-left: 3px solid #c9a84c; }
   .tarefa-card.aguardando { border-left: 3px solid #7777cc; background: #1a1a2a; }
   .tarefa-card.devolvida { border-left: 3px solid #e2874a; background: #1e1a14; }
@@ -285,12 +287,21 @@
 
   .btn-excluir {
     background: none; border: none;
-    color: #444; font-size: 16px;
+    color: #666; font-size: 18px;
     cursor: pointer; padding: 2px 6px;
     border-radius: 4px;
     transition: color 0.15s;
   }
   .btn-excluir:hover { color: #e24b4a; }
+
+  .btn-limpar {
+    background: none; border: 1px solid #333;
+    color: #666; font-size: 13px;
+    padding: 6px 14px; border-radius: 6px;
+    cursor: pointer; margin-left: 8px;
+    transition: all 0.15s;
+  }
+  .btn-limpar:hover { border-color: #e24b4a; color: #e24b4a; }
 
   .btn-editar {
     background: none; border: none;
@@ -602,6 +613,7 @@ function renderMinhas() {
 
   document.getElementById('conteudo').innerHTML = `
     <button class="btn-nova" onclick="abrirModal()">+ Nova tarefa</button>
+    ${usuarioAtual === 'gustavo' && todas.filter(t => t.status === 'concluida').length > 0 ? `<button class="btn-limpar" onclick="limparConcluidas()">🗑 Limpar concluídas</button>` : ''}
     <div class="filtros">
       <div class="filtro-btn ${filtroStatus==='todas'?'ativo':''}" onclick="setFiltro('todas')">Todas (${todas.length})</div>
       ${aguardando > 0 ? `<div class="filtro-btn ${filtroStatus==='aguardando'?'ativo':''}" onclick="setFiltro('aguardando')" style="color:#9999ee;border-color:#7777cc55">⏳ Aguardando (${aguardando})</div>` : ''}
@@ -706,7 +718,7 @@ function isAtrasada(t) {
 }
 
 function podeExcluir(t) {
-  return t.criadoPor === usuarioAtual || usuarioAtual === 'gustavo';
+  return usuarioAtual === 'gustavo' || t.criadoPor === usuarioAtual || !t.criadoPor;
 }
 
 let editandoId = null;
@@ -735,6 +747,13 @@ function formatarData(data) {
 function setFiltro(f) {
   filtroStatus = f;
   renderConteudo();
+}
+
+function limparConcluidas() {
+  if (!confirm('Apagar todas as tarefas concluídas?')) return;
+  Object.entries(tarefas).forEach(([id, t]) => {
+    if (t.status === 'concluida') REF.child(id).remove();
+  });
 }
 
 function aceitarTarefa(id) {

@@ -410,6 +410,62 @@
   }
   .btn-salvar:hover { background: #d4b05e; }
 
+  /* ── ROTINA ── */
+  .rotina-header {
+    display: flex; align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.25rem;
+  }
+  .rotina-progresso {
+    font-size: 14px; color: #888;
+  }
+  .rotina-barra-wrap {
+    background: #222; border-radius: 4px;
+    height: 6px; flex: 1; margin: 0 12px;
+    overflow: hidden;
+  }
+  .rotina-barra {
+    height: 100%; background: #c9a84c;
+    border-radius: 4px; transition: width 0.3s;
+  }
+  .rotina-item {
+    display: flex; align-items: flex-start;
+    gap: 12px; padding: 12px 16px;
+    background: #1a1a1a; border: 1px solid #2a2a2a;
+    border-radius: 10px; margin-bottom: 8px;
+    cursor: pointer; transition: all 0.15s;
+    user-select: none;
+  }
+  .rotina-item:hover { border-color: #333; }
+  .rotina-item.feito { opacity: 0.45; }
+  .rotina-item.feito:hover { opacity: 0.65; }
+  .rotina-check {
+    width: 22px; height: 22px; min-width: 22px;
+    border-radius: 6px; border: 1.5px solid #444;
+    display: flex; align-items: center; justify-content: center;
+    margin-top: 1px; transition: all 0.15s;
+    font-size: 13px; font-weight: 700; color: #000;
+  }
+  .rotina-item.feito .rotina-check {
+    background: #c9a84c; border-color: #c9a84c;
+  }
+  .rotina-item.feito .rotina-check::after { content: '✓'; }
+  .rotina-desc { font-size: 16px; line-height: 1.4; color: #f0f0f0; flex: 1; }
+  .rotina-item.feito .rotina-desc { text-decoration: line-through; color: #666; }
+  .rotina-periodo { font-size: 12px; color: #555; margin-top: 3px; }
+
+  .rotina-pessoa { margin-bottom: 2rem; }
+  .rotina-pessoa-header {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 10px;
+  }
+  .rotina-pessoa-nome { font-size: 16px; font-weight: 600; }
+  .rotina-pct {
+    font-size: 13px; padding: 2px 8px;
+    border-radius: 20px; background: #2a2a2a; color: #888;
+  }
+  .rotina-pct.completo { background: #1e2a1e; color: #5a9e5a; }
+
   /* ── RESPONSIVO ── */
   @media (max-width: 480px) {
     .grid-usuarios { grid-template-columns: repeat(2, 1fr); }
@@ -484,6 +540,31 @@ const FIREBASE_CONFIG = {
 firebase.initializeApp(FIREBASE_CONFIG);
 const DB = firebase.database();
 const REF = DB.ref('tarefas');
+const REF_ROTINA = DB.ref('rotina');
+
+const ROTINAS = {
+  emilly: [
+    { id: 1, desc: 'Verificar o grupo do Wellhub para validar tokens', periodo: '08h–11h' },
+    { id: 2, desc: 'Adicionar créditos referentes aos tokens do dia anterior e acompanhar novas solicitações', periodo: '08h–11h' },
+    { id: 3, desc: 'Acessar o e-mail, filtrar pedidos de cancelamento, etiquetar e organizar caixa de entrada', periodo: '08h–11h' },
+    { id: 4, desc: 'Enviar print dos cancelamentos no grupo interno', periodo: '08h–11h' },
+    { id: 5, desc: 'Encaminhar e-mail padrão para cada aluno que solicitou cancelamento', periodo: '08h–11h' },
+    { id: 6, desc: 'Abrir atendimento individual para cada cancelamento, tratar e buscar reversão', periodo: '08h–11h' },
+    { id: 7, desc: 'Após concluir cancelamento, alterar etiqueta do aluno de Lead para Ex-aluno', periodo: '08h–11h' },
+    { id: 8, desc: 'Realizar renovações e efetuar transações dos planos', periodo: '08h–11h' },
+    { id: 9, desc: 'Conferir contratos com vencimento do dia e renovar', periodo: '08h–11h' },
+    { id: 10, desc: 'Verificar contratos com vencimento de até 3 dias — oferecer antecipação ou upgrade de plano', periodo: '08h–11h' },
+    { id: 11, desc: 'Planejamento do dia', periodo: '08h–11h' },
+    { id: 12, desc: 'Divulgar campanha diária nos grupos de WhatsApp', periodo: '08h–11h' },
+    { id: 13, desc: 'Disparar campanha em massa no FitzAp', periodo: '08h–11h' },
+    { id: 14, desc: 'Verificar FitzAp e responder todos os atendimentos pendentes (vendas, suporte, solicitações)', periodo: 'Dia todo' },
+    { id: 15, desc: 'Manter FitzAp acompanhado durante todo o dia, respondendo novos atendimentos conforme chegam', periodo: 'Dia todo' },
+    { id: 16, desc: 'Trabalhar carteira de clientes — indicações, contatos e campanhas para geração de leads', periodo: 'Dia todo' },
+    { id: 17, desc: 'Foco total em vendas', periodo: 'A partir das 11h' },
+  ],
+  julia: [],
+  luana: [],
+};
 
 const USUARIOS = [
   { id: 'gustavo',  nome: 'Gustavo',  cargo: 'CEO',       gestor: true },
@@ -498,8 +579,13 @@ const USUARIOS = [
 
 let usuarioAtual = null;
 let tarefas = {};
+let rotinaHoje = {};
 let tabAtiva = 'minhas';
 let filtroStatus = 'todas';
+
+function hoje() {
+  return new Date().toISOString().split('T')[0];
+}
 
 function iniciais(nome) {
   return nome.split(' ').map(p => p[0]).join('').slice(0,2).toUpperCase();
@@ -552,8 +638,10 @@ function renderTabs() {
   const u = usuario(usuarioAtual);
   const pendentes = contarAguardando();
   const badge = pendentes > 0 ? `<span class="badge-notif">${pendentes}</span>` : '';
+  const temRotina = ROTINAS[usuarioAtual] && ROTINAS[usuarioAtual].length > 0;
   const tabs = [
     { id: 'minhas', label: `Minhas tarefas${badge}` },
+    ...(temRotina || u.gestor ? [{ id: 'rotina', label: 'Rotina diária' }] : []),
     ...(u.gestor ? [{ id: 'geral', label: 'Visão geral' }] : []),
   ];
   document.getElementById('tabs').innerHTML = tabs.map(t => `
@@ -573,11 +661,16 @@ function escutarTarefas() {
     tarefas = snap.val() || {};
     renderConteudo();
   });
+  REF_ROTINA.child(hoje()).on('value', snap => {
+    rotinaHoje = snap.val() || {};
+    if (tabAtiva === 'rotina') renderConteudo();
+  });
 }
 
 // ── RENDERIZAÇÃO ──
 function renderConteudo() {
   if (tabAtiva === 'minhas') renderMinhas();
+  else if (tabAtiva === 'rotina') renderRotina();
   else renderGeral();
 }
 
@@ -662,6 +755,79 @@ function renderGeral() {
   }
 
   document.getElementById('conteudo').innerHTML = html;
+}
+
+function renderRotina() {
+  const u = usuario(usuarioAtual);
+  const isGestor = u.gestor;
+
+  if (isGestor) {
+    // Visão geral da rotina de cada pessoa
+    const usuarios_rotina = USUARIOS.filter(u => ROTINAS[u.id] && ROTINAS[u.id].length > 0);
+    if (usuarios_rotina.length === 0) {
+      document.getElementById('conteudo').innerHTML = '<div class="vazio">Nenhuma rotina cadastrada ainda.</div>';
+      return;
+    }
+    let html = '';
+    for (const u of usuarios_rotina) {
+      const itens = ROTINAS[u.id];
+      const statusHoje = rotinaHoje[u.id] || {};
+      const feitos = itens.filter(i => statusHoje[i.id]).length;
+      const pct = Math.round((feitos / itens.length) * 100);
+      const completo = feitos === itens.length;
+      html += `
+        <div class="rotina-pessoa">
+          <div class="rotina-pessoa-header">
+            <div class="pessoa-avatar-sm">${iniciais(u.nome)}</div>
+            <div class="rotina-pessoa-nome">${u.nome}</div>
+            <span class="rotina-pct ${completo ? 'completo' : ''}">${feitos}/${itens.length} hoje ${completo ? '✓' : ''}</span>
+            <div class="rotina-barra-wrap" style="max-width:120px">
+              <div class="rotina-barra" style="width:${pct}%"></div>
+            </div>
+          </div>
+        </div>`;
+    }
+    document.getElementById('conteudo').innerHTML = html;
+    return;
+  }
+
+  // Visão individual
+  const itens = ROTINAS[usuarioAtual] || [];
+  if (itens.length === 0) {
+    document.getElementById('conteudo').innerHTML = '<div class="vazio">Nenhuma rotina cadastrada para você ainda.</div>';
+    return;
+  }
+  const statusHoje = rotinaHoje[usuarioAtual] || {};
+  const feitos = itens.filter(i => statusHoje[i.id]).length;
+  const pct = Math.round((feitos / itens.length) * 100);
+
+  let html = `
+    <div class="rotina-header">
+      <span class="rotina-progresso">${feitos} de ${itens.length} concluídas hoje</span>
+      <div class="rotina-barra-wrap"><div class="rotina-barra" style="width:${pct}%"></div></div>
+      <span class="rotina-progresso">${pct}%</span>
+    </div>
+    <div>`;
+
+  for (const item of itens) {
+    const feito = !!statusHoje[item.id];
+    html += `
+      <div class="rotina-item ${feito ? 'feito' : ''}" onclick="toggleRotina('${usuarioAtual}', ${item.id}, ${feito})">
+        <div class="rotina-check"></div>
+        <div>
+          <div class="rotina-desc">${item.desc}</div>
+          <div class="rotina-periodo">${item.periodo}</div>
+        </div>
+      </div>`;
+  }
+  html += '</div>';
+  document.getElementById('conteudo').innerHTML = html;
+}
+
+function toggleRotina(userId, itemId, atual) {
+  const path = `${hoje()}/${userId}/${itemId}`;
+  if (atual) REF_ROTINA.child(path).remove();
+  else REF_ROTINA.child(path).set(true);
 }
 
 function cardTarefa(t, mostrarResponsavel) {

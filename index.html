@@ -501,6 +501,29 @@
   <div class="conteudo" id="conteudo"></div>
 </div>
 
+<!-- MODAL ITEM DE ROTINA -->
+<div class="overlay" id="overlay-rotina">
+  <div class="modal">
+    <h2 id="modal-rotina-titulo">Item de Rotina</h2>
+    <div class="campo">
+      <label>Descrição *</label>
+      <textarea id="r-descricao" placeholder="O que precisa ser feito?"></textarea>
+    </div>
+    <div class="campo">
+      <label>Horário / Período</label>
+      <input type="text" id="r-periodo" placeholder="Ex: 08h–11h, Dia todo, A partir das 11h">
+    </div>
+    <div class="campo" id="r-campo-usuario" style="display:none">
+      <label>Pessoa</label>
+      <select id="r-usuario"></select>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-cancelar" onclick="fecharModalRotina()">Cancelar</button>
+      <button class="btn-salvar" onclick="salvarItemRotina()">Salvar</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL NOVA TAREFA -->
 <div class="overlay" id="overlay">
   <div class="modal">
@@ -541,29 +564,29 @@ firebase.initializeApp(FIREBASE_CONFIG);
 const DB = firebase.database();
 const REF = DB.ref('tarefas');
 const REF_ROTINA = DB.ref('rotina');
+const REF_CONFIG = DB.ref('rotinas_config');
 
-const ROTINAS = {
+// Seed inicial da Emilly — só usado se o banco estiver vazio
+const ROTINAS_SEED = {
   emilly: [
-    { id: 1, desc: 'Verificar o grupo do Wellhub para validar tokens', periodo: '08h–11h' },
-    { id: 2, desc: 'Adicionar créditos referentes aos tokens do dia anterior e acompanhar novas solicitações', periodo: '08h–11h' },
-    { id: 3, desc: 'Acessar o e-mail, filtrar pedidos de cancelamento, etiquetar e organizar caixa de entrada', periodo: '08h–11h' },
-    { id: 4, desc: 'Enviar print dos cancelamentos no grupo interno', periodo: '08h–11h' },
-    { id: 5, desc: 'Encaminhar e-mail padrão para cada aluno que solicitou cancelamento', periodo: '08h–11h' },
-    { id: 6, desc: 'Abrir atendimento individual para cada cancelamento, tratar e buscar reversão', periodo: '08h–11h' },
-    { id: 7, desc: 'Após concluir cancelamento, alterar etiqueta do aluno de Lead para Ex-aluno', periodo: '08h–11h' },
-    { id: 8, desc: 'Realizar renovações e efetuar transações dos planos', periodo: '08h–11h' },
-    { id: 9, desc: 'Conferir contratos com vencimento do dia e renovar', periodo: '08h–11h' },
-    { id: 10, desc: 'Verificar contratos com vencimento de até 3 dias — oferecer antecipação ou upgrade de plano', periodo: '08h–11h' },
-    { id: 11, desc: 'Planejamento do dia', periodo: '08h–11h' },
-    { id: 12, desc: 'Divulgar campanha diária nos grupos de WhatsApp', periodo: '08h–11h' },
-    { id: 13, desc: 'Disparar campanha em massa no FitzAp', periodo: '08h–11h' },
-    { id: 14, desc: 'Verificar FitzAp e responder todos os atendimentos pendentes (vendas, suporte, solicitações)', periodo: 'Dia todo' },
-    { id: 15, desc: 'Manter FitzAp acompanhado durante todo o dia, respondendo novos atendimentos conforme chegam', periodo: 'Dia todo' },
-    { id: 16, desc: 'Trabalhar carteira de clientes — indicações, contatos e campanhas para geração de leads', periodo: 'Dia todo' },
-    { id: 17, desc: 'Foco total em vendas', periodo: 'A partir das 11h' },
+    { desc: 'Verificar o grupo do Wellhub para validar tokens', periodo: '08h–11h', ordem: 1 },
+    { desc: 'Adicionar créditos referentes aos tokens do dia anterior e acompanhar novas solicitações', periodo: '08h–11h', ordem: 2 },
+    { desc: 'Acessar o e-mail, filtrar pedidos de cancelamento, etiquetar e organizar caixa de entrada', periodo: '08h–11h', ordem: 3 },
+    { desc: 'Enviar print dos cancelamentos no grupo interno', periodo: '08h–11h', ordem: 4 },
+    { desc: 'Encaminhar e-mail padrão para cada aluno que solicitou cancelamento', periodo: '08h–11h', ordem: 5 },
+    { desc: 'Abrir atendimento individual para cada cancelamento, tratar e buscar reversão', periodo: '08h–11h', ordem: 6 },
+    { desc: 'Após concluir cancelamento, alterar etiqueta do aluno de Lead para Ex-aluno', periodo: '08h–11h', ordem: 7 },
+    { desc: 'Realizar renovações e efetuar transações dos planos', periodo: '08h–11h', ordem: 8 },
+    { desc: 'Conferir contratos com vencimento do dia e renovar', periodo: '08h–11h', ordem: 9 },
+    { desc: 'Verificar contratos com vencimento de até 3 dias — oferecer antecipação ou upgrade de plano', periodo: '08h–11h', ordem: 10 },
+    { desc: 'Planejamento do dia', periodo: '08h–11h', ordem: 11 },
+    { desc: 'Divulgar campanha diária nos grupos de WhatsApp', periodo: '08h–11h', ordem: 12 },
+    { desc: 'Disparar campanha em massa no FitzAp', periodo: '08h–11h', ordem: 13 },
+    { desc: 'Verificar FitzAp e responder todos os atendimentos pendentes (vendas, suporte, solicitações)', periodo: 'Dia todo', ordem: 14 },
+    { desc: 'Manter FitzAp acompanhado durante todo o dia, respondendo novos atendimentos conforme chegam', periodo: 'Dia todo', ordem: 15 },
+    { desc: 'Trabalhar carteira de clientes — indicações, contatos e campanhas para geração de leads', periodo: 'Dia todo', ordem: 16 },
+    { desc: 'Foco total em vendas', periodo: 'A partir das 11h', ordem: 17 },
   ],
-  julia: [],
-  luana: [],
 };
 
 const USUARIOS = [
@@ -580,8 +603,11 @@ const USUARIOS = [
 let usuarioAtual = null;
 let tarefas = {};
 let rotinaHoje = {};
+let rotinasConfig = {};
 let tabAtiva = 'minhas';
 let filtroStatus = 'todas';
+let editandoRotinaId = null;
+let editandoRotinaUser = null;
 
 function hoje() {
   return new Date().toISOString().split('T')[0];
@@ -638,7 +664,7 @@ function renderTabs() {
   const u = usuario(usuarioAtual);
   const pendentes = contarAguardando();
   const badge = pendentes > 0 ? `<span class="badge-notif">${pendentes}</span>` : '';
-  const temRotina = ROTINAS[usuarioAtual] && ROTINAS[usuarioAtual].length > 0;
+  const temRotina = u.gestor || (rotinasConfig[usuarioAtual] && Object.keys(rotinasConfig[usuarioAtual]).length > 0);
   const tabs = [
     { id: 'minhas', label: `Minhas tarefas${badge}` },
     ...(temRotina || u.gestor ? [{ id: 'rotina', label: 'Rotina diária' }] : []),
@@ -663,6 +689,15 @@ function escutarTarefas() {
   });
   REF_ROTINA.child(hoje()).on('value', snap => {
     rotinaHoje = snap.val() || {};
+    if (tabAtiva === 'rotina') renderConteudo();
+  });
+  REF_CONFIG.on('value', snap => {
+    rotinasConfig = snap.val() || {};
+    // seed emilly se banco estiver vazio
+    if (!rotinasConfig.emilly) {
+      ROTINAS_SEED.emilly.forEach(item => REF_CONFIG.child('emilly').push(item));
+    }
+    renderTabs();
     if (tabAtiva === 'rotina') renderConteudo();
   });
 }
@@ -757,33 +792,61 @@ function renderGeral() {
   document.getElementById('conteudo').innerHTML = html;
 }
 
+function itensOrdenados(userId) {
+  const cfg = rotinasConfig[userId] || {};
+  return Object.entries(cfg)
+    .map(([id, v]) => ({ id, ...v }))
+    .sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
+}
+
 function renderRotina() {
   const u = usuario(usuarioAtual);
+  const isCeo = usuarioAtual === 'gustavo';
   const isGestor = u.gestor;
 
   if (isGestor) {
-    // Visão geral da rotina de cada pessoa
-    const usuarios_rotina = USUARIOS.filter(u => ROTINAS[u.id] && ROTINAS[u.id].length > 0);
-    if (usuarios_rotina.length === 0) {
-      document.getElementById('conteudo').innerHTML = '<div class="vazio">Nenhuma rotina cadastrada ainda.</div>';
+    // ── Visão CEO / gestor: ver todos + gerenciar ──
+    const usuariosComRotina = USUARIOS.filter(u => rotinasConfig[u.id] && Object.keys(rotinasConfig[u.id]).length > 0);
+    let html = isCeo ? `<button class="btn-nova" onclick="abrirModalRotina(null, null)">+ Adicionar item de rotina</button>` : '';
+
+    if (usuariosComRotina.length === 0) {
+      html += '<div class="vazio" style="margin-top:2rem">Nenhuma rotina cadastrada ainda.</div>';
+      document.getElementById('conteudo').innerHTML = html;
       return;
     }
-    let html = '';
-    for (const u of usuarios_rotina) {
-      const itens = ROTINAS[u.id];
+
+    for (const u of usuariosComRotina) {
+      const itens = itensOrdenados(u.id);
       const statusHoje = rotinaHoje[u.id] || {};
       const feitos = itens.filter(i => statusHoje[i.id]).length;
-      const pct = Math.round((feitos / itens.length) * 100);
-      const completo = feitos === itens.length;
+      const pct = itens.length ? Math.round((feitos / itens.length) * 100) : 0;
+      const completo = itens.length > 0 && feitos === itens.length;
+
       html += `
         <div class="rotina-pessoa">
           <div class="rotina-pessoa-header">
             <div class="pessoa-avatar-sm">${iniciais(u.nome)}</div>
             <div class="rotina-pessoa-nome">${u.nome}</div>
-            <span class="rotina-pct ${completo ? 'completo' : ''}">${feitos}/${itens.length} hoje ${completo ? '✓' : ''}</span>
-            <div class="rotina-barra-wrap" style="max-width:120px">
-              <div class="rotina-barra" style="width:${pct}%"></div>
-            </div>
+            <span class="rotina-pct ${completo ? 'completo' : ''}">${feitos}/${itens.length} hoje${completo ? ' ✓' : ''}</span>
+            <div class="rotina-barra-wrap" style="max-width:100px"><div class="rotina-barra" style="width:${pct}%"></div></div>
+            ${isCeo ? `<button class="btn-limpar" onclick="abrirModalRotina('${u.id}', null)" style="margin-left:auto;font-size:12px">+ Item</button>` : ''}
+          </div>
+          <div>
+            ${itens.map(item => {
+              const feito = !!statusHoje[item.id];
+              return `
+              <div class="rotina-item ${feito ? 'feito' : ''}" style="cursor:default">
+                <div class="rotina-check ${feito ? '' : ''}" style="cursor:default"></div>
+                <div style="flex:1">
+                  <div class="rotina-desc">${item.desc}</div>
+                  <div class="rotina-periodo">${item.periodo || ''}</div>
+                </div>
+                ${isCeo ? `
+                  <button class="btn-editar" onclick="abrirModalRotina('${u.id}','${item.id}')" title="Editar">✎</button>
+                  <button class="btn-excluir" onclick="removerItemRotina('${u.id}','${item.id}')">×</button>
+                ` : ''}
+              </div>`;
+            }).join('')}
           </div>
         </div>`;
     }
@@ -791,8 +854,8 @@ function renderRotina() {
     return;
   }
 
-  // Visão individual
-  const itens = ROTINAS[usuarioAtual] || [];
+  // ── Visão individual ──
+  const itens = itensOrdenados(usuarioAtual);
   if (itens.length === 0) {
     document.getElementById('conteudo').innerHTML = '<div class="vazio">Nenhuma rotina cadastrada para você ainda.</div>';
     return;
@@ -812,11 +875,11 @@ function renderRotina() {
   for (const item of itens) {
     const feito = !!statusHoje[item.id];
     html += `
-      <div class="rotina-item ${feito ? 'feito' : ''}" onclick="toggleRotina('${usuarioAtual}', ${item.id}, ${feito})">
+      <div class="rotina-item ${feito ? 'feito' : ''}" onclick="toggleRotina('${usuarioAtual}','${item.id}',${feito})">
         <div class="rotina-check"></div>
         <div>
           <div class="rotina-desc">${item.desc}</div>
-          <div class="rotina-periodo">${item.periodo}</div>
+          <div class="rotina-periodo">${item.periodo || ''}</div>
         </div>
       </div>`;
   }
@@ -828,6 +891,75 @@ function toggleRotina(userId, itemId, atual) {
   const path = `${hoje()}/${userId}/${itemId}`;
   if (atual) REF_ROTINA.child(path).remove();
   else REF_ROTINA.child(path).set(true);
+}
+
+// ── CRUD ROTINA ──
+function abrirModalRotina(userId, itemId) {
+  editandoRotinaUser = userId;
+  editandoRotinaId = itemId;
+
+  const overlay = document.getElementById('overlay-rotina');
+  const titulo = document.getElementById('modal-rotina-titulo');
+  const descEl = document.getElementById('r-descricao');
+  const perEl = document.getElementById('r-periodo');
+  const campoUser = document.getElementById('r-campo-usuario');
+  const selUser = document.getElementById('r-usuario');
+
+  if (itemId && userId) {
+    // editar item existente
+    titulo.textContent = 'Editar Item de Rotina';
+    const item = rotinasConfig[userId]?.[itemId] || {};
+    descEl.value = item.desc || '';
+    perEl.value = item.periodo || '';
+    campoUser.style.display = 'none';
+  } else {
+    // novo item
+    titulo.textContent = 'Novo Item de Rotina';
+    descEl.value = '';
+    perEl.value = '';
+    // mostrar seletor de usuário se não especificado
+    if (!userId) {
+      campoUser.style.display = 'block';
+      selUser.innerHTML = USUARIOS
+        .filter(u => !u.gestor)
+        .map(u => `<option value="${u.id}">${u.nome} — ${u.cargo}</option>`)
+        .join('');
+    } else {
+      campoUser.style.display = 'none';
+    }
+  }
+
+  overlay.classList.add('aberto');
+  descEl.focus();
+}
+
+function fecharModalRotina() {
+  document.getElementById('overlay-rotina').classList.remove('aberto');
+  editandoRotinaId = null;
+  editandoRotinaUser = null;
+}
+
+function salvarItemRotina() {
+  const desc = document.getElementById('r-descricao').value.trim();
+  const periodo = document.getElementById('r-periodo').value.trim();
+  if (!desc) { alert('Descreva o item.'); return; }
+
+  const userId = editandoRotinaUser || document.getElementById('r-usuario').value;
+
+  if (editandoRotinaId) {
+    REF_CONFIG.child(userId).child(editandoRotinaId).update({ desc, periodo });
+  } else {
+    const itens = itensOrdenados(userId);
+    const ordem = itens.length + 1;
+    REF_CONFIG.child(userId).push({ desc, periodo, ordem });
+  }
+  fecharModalRotina();
+}
+
+function removerItemRotina(userId, itemId) {
+  if (confirm('Remover este item da rotina?')) {
+    REF_CONFIG.child(userId).child(itemId).remove();
+  }
 }
 
 function cardTarefa(t, mostrarResponsavel) {
@@ -1001,6 +1133,9 @@ if (salvo && USUARIOS.find(u => u.id === salvo)) entrar(salvo);
 
 document.getElementById('overlay').addEventListener('click', e => {
   if (e.target === document.getElementById('overlay')) fecharModal();
+});
+document.getElementById('overlay-rotina').addEventListener('click', e => {
+  if (e.target === document.getElementById('overlay-rotina')) fecharModalRotina();
 });
 </script>
 </body>

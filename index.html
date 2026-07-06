@@ -441,6 +441,14 @@
   .rotina-item.feito { opacity: 0.45; }
   .drag-handle { color: #444; font-size: 16px; cursor: grab; padding: 0 6px 0 0; user-select: none; }
   .drag-handle:active { cursor: grabbing; }
+  .rotina-grupo { border: 1px solid #2a2a2a; border-radius: 8px; margin-bottom: 8px; overflow: hidden; }
+  .rotina-grupo-header { display: flex; align-items: center; gap: 10px; padding: 10px 14px; cursor: pointer; list-style: none; background: #161616; }
+  .rotina-grupo-header::-webkit-details-marker { display: none; }
+  .rotina-grupo-nome { font-size: 13px; font-weight: 600; color: #c9a84c; flex: 1; }
+  .rotina-grupo-pct { font-size: 12px; color: #555; }
+  .rotina-grupo-pct.completo { color: #5a9e5a; }
+  .rotina-grupo .rotina-item { border-radius: 0; border-left: none; border-right: none; border-top: none; border-bottom: 1px solid #1a1a1a; margin-bottom: 0; }
+  .rotina-grupo .rotina-item:last-child { border-bottom: none; }
   .rotina-item.feito:hover { opacity: 0.65; }
   .rotina-check {
     width: 22px; height: 22px; min-width: 22px;
@@ -515,6 +523,10 @@
     <div class="campo">
       <label>Horário / Período</label>
       <input type="text" id="r-periodo" placeholder="Ex: 08h–11h, Dia todo, A partir das 11h">
+    </div>
+    <div class="campo">
+      <label>Grupo <span style="color:#555;font-size:12px">(opcional — agrupa itens relacionados)</span></label>
+      <input type="text" id="r-grupo" placeholder="Ex: Cancelamentos, Wellhub, FitzAp">
     </div>
     <div class="campo" id="r-campo-usuario" style="display:none">
       <label>Pessoa</label>
@@ -859,6 +871,55 @@ function itensOrdenados(userId) {
     .sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
 }
 
+function renderItemRotina(item, userId, statusHoje, isCeo, draggable = true) {
+  const feito = !!statusHoje[item.id];
+  return `
+    <div class="rotina-item ${feito ? 'feito' : ''}"
+      ${draggable ? `draggable="true" data-itemid="${item.id}" data-userid="${userId}"
+      ondragstart="dragStart(event)" ondragover="dragOver(event)" ondrop="dragDrop(event)" ondragend="dragEnd(event)"` : ''}
+      style="${!draggable ? 'cursor:default' : ''}">
+      ${draggable ? `<span class="drag-handle" title="Arrastar">⠿</span>` : ''}
+      <div class="rotina-check" onclick="toggleRotina('${userId}','${item.id}',${feito})" style="cursor:pointer${!draggable ? ';cursor:default' : ''}"></div>
+      <div onclick="${draggable ? `toggleRotina('${userId}','${item.id}',${feito})` : ''}" style="flex:1;${draggable ? 'cursor:pointer' : 'cursor:default'}">
+        <div class="rotina-desc">${item.desc}</div>
+        <div class="rotina-periodo">${item.periodo || ''}</div>
+      </div>
+      ${isCeo ? `
+        <button class="btn-editar" onclick="abrirModalRotina('${userId}','${item.id}')" title="Editar">✎</button>
+        <button class="btn-excluir" onclick="removerItemRotina('${userId}','${item.id}')">×</button>
+      ` : ''}
+    </div>`;
+}
+
+function renderGruposRotina(itens, userId, statusHoje, isCeo, draggable = true) {
+  const semGrupo = itens.filter(i => !i.grupo);
+  const grupos = {};
+  itens.filter(i => i.grupo).forEach(i => {
+    if (!grupos[i.grupo]) grupos[i.grupo] = [];
+    grupos[i.grupo].push(i);
+  });
+
+  let html = '';
+
+  // itens sem grupo primeiro
+  html += semGrupo.map(i => renderItemRotina(i, userId, statusHoje, isCeo, draggable)).join('');
+
+  // grupos colapsáveis
+  for (const [nomeGrupo, gitens] of Object.entries(grupos)) {
+    const feitosGrupo = gitens.filter(i => statusHoje[i.id]).length;
+    const completo = feitosGrupo === gitens.length;
+    html += `
+      <details class="rotina-grupo" ${completo ? '' : 'open'}>
+        <summary class="rotina-grupo-header">
+          <span class="rotina-grupo-nome">${nomeGrupo}</span>
+          <span class="rotina-grupo-pct ${completo ? 'completo' : ''}">${feitosGrupo}/${gitens.length}${completo ? ' ✓' : ''}</span>
+        </summary>
+        ${gitens.map(i => renderItemRotina(i, userId, statusHoje, isCeo, draggable)).join('')}
+      </details>`;
+  }
+  return html;
+}
+
 function renderRotina() {
   const u = usuario(usuarioAtual);
   const isCeo = usuarioAtual === 'gustavo';
@@ -903,25 +964,7 @@ function renderRotina() {
             ${isCeo ? `<button class="btn-limpar" onclick="abrirModalRotina('${u.id}', null)" style="margin-left:auto;font-size:12px">+ Item</button>` : ''}
           </div>
           <div class="rotina-lista" data-userid="${u.id}">
-            ${itens.map(item => {
-              const feito = !!statusHoje[item.id];
-              return `
-              <div class="rotina-item ${feito ? 'feito' : ''}" style="cursor:default"
-                draggable="${isCeo ? 'true' : 'false'}"
-                data-itemid="${item.id}" data-userid="${u.id}"
-                ondragstart="dragStart(event)" ondragover="dragOver(event)" ondrop="dragDrop(event)" ondragend="dragEnd(event)">
-                ${isCeo ? `<span class="drag-handle" title="Arrastar">⠿</span>` : ''}
-                <div class="rotina-check" style="cursor:default"></div>
-                <div style="flex:1">
-                  <div class="rotina-desc">${item.desc}</div>
-                  <div class="rotina-periodo">${item.periodo || ''}</div>
-                </div>
-                ${isCeo ? `
-                  <button class="btn-editar" onclick="abrirModalRotina('${u.id}','${item.id}')" title="Editar">✎</button>
-                  <button class="btn-excluir" onclick="removerItemRotina('${u.id}','${item.id}')">×</button>
-                ` : ''}
-              </div>`;
-            }).join('')}
+            ${renderGruposRotina(itens, u.id, statusHoje, isCeo, isCeo)}
           </div>
         </div>`;
     }
@@ -945,23 +988,9 @@ function renderRotina() {
       <div class="rotina-barra-wrap"><div class="rotina-barra" style="width:${pct}%"></div></div>
       <span class="rotina-progresso">${pct}%</span>
     </div>
-    <div class="rotina-lista" data-userid="${usuarioAtual}">`;
-
-  for (const item of itens) {
-    const feito = !!statusHoje[item.id];
-    html += `
-      <div class="rotina-item ${feito ? 'feito' : ''}"
-        draggable="true" data-itemid="${item.id}" data-userid="${usuarioAtual}"
-        ondragstart="dragStart(event)" ondragover="dragOver(event)" ondrop="dragDrop(event)" ondragend="dragEnd(event)">
-        <span class="drag-handle" title="Arrastar">⠿</span>
-        <div class="rotina-check" onclick="toggleRotina('${usuarioAtual}','${item.id}',${feito})" style="cursor:pointer"></div>
-        <div onclick="toggleRotina('${usuarioAtual}','${item.id}',${feito})" style="flex:1;cursor:pointer">
-          <div class="rotina-desc">${item.desc}</div>
-          <div class="rotina-periodo">${item.periodo || ''}</div>
-        </div>
-      </div>`;
-  }
-  html += '</div>';
+    <div class="rotina-lista" data-userid="${usuarioAtual}">
+    ${renderGruposRotina(itens, usuarioAtual, statusHoje, false, true)}
+    </div>`;
   document.getElementById('conteudo').innerHTML = html;
 }
 
@@ -1030,12 +1059,14 @@ function abrirModalRotina(userId, itemId) {
     const item = rotinasConfig[userId]?.[itemId] || {};
     descEl.value = item.desc || '';
     perEl.value = item.periodo || '';
+    document.getElementById('r-grupo').value = item.grupo || '';
     campoUser.style.display = 'none';
   } else {
     // novo item
     titulo.textContent = 'Novo Item de Rotina';
     descEl.value = '';
     perEl.value = '';
+    document.getElementById('r-grupo').value = '';
     // mostrar seletor de usuário se não especificado
     if (!userId) {
       campoUser.style.display = 'block';
@@ -1061,16 +1092,18 @@ function fecharModalRotina() {
 function salvarItemRotina() {
   const desc = document.getElementById('r-descricao').value.trim();
   const periodo = document.getElementById('r-periodo').value.trim();
+  const grupo = document.getElementById('r-grupo').value.trim();
   if (!desc) { alert('Descreva o item.'); return; }
 
   const userId = editandoRotinaUser || document.getElementById('r-usuario').value;
+  const dados = { desc, periodo, ...(grupo ? { grupo } : { grupo: null }) };
 
   if (editandoRotinaId) {
-    REF_CONFIG.child(userId).child(editandoRotinaId).update({ desc, periodo });
+    REF_CONFIG.child(userId).child(editandoRotinaId).update(dados);
   } else {
     const itens = itensOrdenados(userId);
     const ordem = itens.length + 1;
-    REF_CONFIG.child(userId).push({ desc, periodo, ordem });
+    REF_CONFIG.child(userId).push({ ...dados, ordem });
   }
   fecharModalRotina();
 }

@@ -122,7 +122,34 @@ async function seed() {
   }
 }
 
+const JULIA_ROTINA = [
+  { desc: 'Adicionar créditos para alunos Wellhub', periodo: '11h', ordem: 1 },
+  { desc: 'Verificar fila das aulas e aulas vazias / abrir novas aulas', periodo: '11h15', ordem: 2 },
+  { desc: 'Verificar atendimentos e grupos — pendências de professores + Wellhub em paralelo', periodo: '11h30', ordem: 3 },
+  { desc: 'Ajustar agenda e divulgar as aulas', periodo: '12h', ordem: 4 },
+  { desc: 'Atendimentos FitzAp e grupos — solicitações de alunos', periodo: '12h30', ordem: 5 },
+  { desc: 'Finalizar atendimentos da manhã', periodo: '13h', ordem: 6 },
+  { desc: 'Organização do café e recepção (varrer e limpar)', periodo: '16h', ordem: 7 },
+  { desc: 'Grupos e munhequeiras + Wellhub e FitzAp em paralelo', periodo: '17h', ordem: 8 },
+  { desc: 'Divulgar aula do período da manhã e atendimentos', periodo: '18h', ordem: 9 },
+  { desc: 'Divulgar link de avaliação nos grupos', periodo: '19h', ordem: 10 },
+  { desc: 'Atendimento FitzAp e Wellhub', periodo: '20h–22h', ordem: 11 },
+];
+
+async function seedJulia() {
+  linha('Limpando rotina antiga da Júlia...', 'info');
+  await firebase.database().ref('rotinas_config/julia').remove();
+  for (const item of JULIA_ROTINA) {
+    await firebase.database().ref('rotinas_config/julia').push(item);
+  }
+  linha(`✓ ${JULIA_ROTINA.length} itens da rotina da Júlia inseridos!`, 'ok');
+  linha('Pode fechar esta aba.', 'ok');
+}
+
 seed();
 </script>
+<button onclick="seedJulia()" style="margin-top:2rem;padding:10px 20px;background:#c9a84c;color:#000;border:none;border-radius:6px;font-size:15px;cursor:pointer;font-weight:bold">
+  ▶ Forçar rotina da Júlia
+</button>
 </body>
 </html>

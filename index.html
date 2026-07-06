@@ -945,19 +945,17 @@ function renderRotina() {
       <div class="rotina-barra-wrap"><div class="rotina-barra" style="width:${pct}%"></div></div>
       <span class="rotina-progresso">${pct}%</span>
     </div>
-    <div>`;
+    <div class="rotina-lista" data-userid="${usuarioAtual}">`;
 
-  html = html.replace('<div>', '<div class="rotina-lista" data-userid="' + usuarioAtual + '">');
   for (const item of itens) {
     const feito = !!statusHoje[item.id];
     html += `
       <div class="rotina-item ${feito ? 'feito' : ''}"
         draggable="true" data-itemid="${item.id}" data-userid="${usuarioAtual}"
-        ondragstart="dragStart(event)" ondragover="dragOver(event)" ondrop="dragDrop(event)" ondragend="dragEnd(event)"
-        onclick="toggleRotina('${usuarioAtual}','${item.id}',${feito})">
-        <span class="drag-handle" title="Arrastar" onclick="event.stopPropagation()">⠿</span>
-        <div class="rotina-check"></div>
-        <div>
+        ondragstart="dragStart(event)" ondragover="dragOver(event)" ondrop="dragDrop(event)" ondragend="dragEnd(event)">
+        <span class="drag-handle" title="Arrastar">⠿</span>
+        <div class="rotina-check" onclick="toggleRotina('${usuarioAtual}','${item.id}',${feito})" style="cursor:pointer"></div>
+        <div onclick="toggleRotina('${usuarioAtual}','${item.id}',${feito})" style="flex:1;cursor:pointer">
           <div class="rotina-desc">${item.desc}</div>
           <div class="rotina-periodo">${item.periodo || ''}</div>
         </div>

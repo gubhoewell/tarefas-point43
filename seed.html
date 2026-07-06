@@ -153,13 +153,24 @@ async function seedJulia() {
   linha('Pode fechar esta aba.', 'ok');
 }
 
+const LUANA_ROTINA = [
+  { desc: 'Ativar leads — abrir leads, fechar com campanha', periodo: 'Dia todo', ordem: 1 },
+  { desc: 'Tratar alunos bloqueados', periodo: 'Dia todo', ordem: 2 },
+  { desc: 'Wellhub / grupos / atendimentos gerais', periodo: 'Dia todo', ordem: 3 },
+  { desc: 'Verificar FitzAp e responder todos os atendimentos pendentes (vendas, suporte, solicitações)', periodo: 'Dia todo', ordem: 4 },
+  { desc: 'Manter FitzAp acompanhado durante todo o dia, respondendo novos atendimentos conforme chegam', periodo: 'Dia todo', ordem: 5 },
+  { desc: 'Trabalhar carteira de clientes — indicações, contatos e campanhas para geração de leads', periodo: 'Dia todo', ordem: 6 },
+  { desc: 'Atendimento presencial na recepção', periodo: 'A partir das 16h', ordem: 7 },
+  { desc: 'Lançar vendas do dia anterior no sistema de games', periodo: 'Dia todo', ordem: 8 },
+];
+
 async function seedLuana() {
   linha('Criando rotina da Luana...', 'info');
   await firebase.database().ref('rotinas_config/luana').remove();
-  for (const [i, item] of ITENS_PADRAO.entries()) {
-    await firebase.database().ref('rotinas_config/luana').push({ ...item, ordem: i + 1 });
+  for (const item of LUANA_ROTINA) {
+    await firebase.database().ref('rotinas_config/luana').push(item);
   }
-  linha(`✓ ${ITENS_PADRAO.length} itens da rotina da Luana inseridos!`, 'ok');
+  linha(`✓ ${LUANA_ROTINA.length} itens da rotina da Luana inseridos!`, 'ok');
   linha('Pode fechar esta aba.', 'ok');
 }
 

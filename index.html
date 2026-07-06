@@ -608,6 +608,7 @@ let tabAtiva = 'minhas';
 let filtroStatus = 'todas';
 let editandoRotinaId = null;
 let editandoRotinaUser = null;
+let dataRotina = hoje();
 
 function hoje() {
   return new Date().toISOString().split('T')[0];
@@ -682,12 +683,30 @@ function mudarTab(id) {
 }
 
 // ── FIREBASE ──
+function mudarDataRotina(novaData) {
+  REF_ROTINA.child(dataRotina).off();
+  dataRotina = novaData;
+  REF_ROTINA.child(dataRotina).on('value', snap => {
+    rotinaHoje = snap.val() || {};
+    if (tabAtiva === 'rotina') renderConteudo();
+  });
+  if (tabAtiva === 'rotina') renderConteudo();
+}
+
+function navegarData(delta) {
+  const d = new Date(dataRotina + 'T12:00:00');
+  d.setDate(d.getDate() + delta);
+  const nova = d.toISOString().slice(0, 10);
+  if (nova > hoje()) return;
+  mudarDataRotina(nova);
+}
+
 function escutarTarefas() {
   REF.on('value', snap => {
     tarefas = snap.val() || {};
     renderConteudo();
   });
-  REF_ROTINA.child(hoje()).on('value', snap => {
+  REF_ROTINA.child(dataRotina).on('value', snap => {
     rotinaHoje = snap.val() || {};
     if (tabAtiva === 'rotina') renderConteudo();
   });
@@ -807,7 +826,18 @@ function renderRotina() {
   if (isGestor) {
     // ── Visão CEO / gestor: ver todos + gerenciar ──
     const usuariosComRotina = USUARIOS.filter(u => rotinasConfig[u.id] && Object.keys(rotinasConfig[u.id]).length > 0);
-    let html = isCeo ? `<button class="btn-nova" onclick="abrirModalRotina(null, null)">+ Adicionar item de rotina</button>` : '';
+    const isHoje = dataRotina === hoje();
+    let html = `
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:1.25rem;flex-wrap:wrap">
+        ${isCeo ? `<button class="btn-nova" onclick="abrirModalRotina(null, null)">+ Adicionar item de rotina</button>` : ''}
+        <div style="display:flex;align-items:center;gap:6px;margin-left:auto">
+          <button class="btn-trocar" onclick="navegarData(-1)">‹</button>
+          <input type="date" value="${dataRotina}" onchange="mudarDataRotina(this.value)"
+            style="background:#1a1a1a;border:1px solid #2a2a2a;color:#f0f0f0;padding:6px 10px;border-radius:6px;font-size:14px">
+          <button class="btn-trocar" onclick="navegarData(1)" ${isHoje ? 'disabled style="opacity:0.3"' : ''}>›</button>
+          ${!isHoje ? `<button class="btn-trocar" onclick="mudarDataRotina('${hoje()}')">Hoje</button>` : ''}
+        </div>
+      </div>`;
 
     if (usuariosComRotina.length === 0) {
       html += '<div class="vazio" style="margin-top:2rem">Nenhuma rotina cadastrada ainda.</div>';

@@ -602,6 +602,14 @@ const ROTINAS_SEED = {
     { desc: 'Divulgar aula do período da manhã e atendimentos', periodo: '18h', ordem: 9 },
     { desc: 'Divulgar link de avaliação nos grupos', periodo: '19h', ordem: 10 },
     { desc: 'Atendimento FitzAp e Wellhub', periodo: '20h–22h', ordem: 11 },
+    { desc: 'Verificar FitzAp e responder todos os atendimentos pendentes (vendas, suporte, solicitações)', periodo: 'Dia todo', ordem: 12 },
+    { desc: 'Manter FitzAp acompanhado durante todo o dia, respondendo novos atendimentos conforme chegam', periodo: 'Dia todo', ordem: 13 },
+    { desc: 'Trabalhar carteira de clientes — indicações, contatos e campanhas para geração de leads', periodo: 'Dia todo', ordem: 14 },
+  ],
+  luana: [
+    { desc: 'Verificar FitzAp e responder todos os atendimentos pendentes (vendas, suporte, solicitações)', periodo: 'Dia todo', ordem: 1 },
+    { desc: 'Manter FitzAp acompanhado durante todo o dia, respondendo novos atendimentos conforme chegam', periodo: 'Dia todo', ordem: 2 },
+    { desc: 'Trabalhar carteira de clientes — indicações, contatos e campanhas para geração de leads', periodo: 'Dia todo', ordem: 3 },
   ],
 };
 
@@ -733,6 +741,9 @@ function escutarTarefas() {
     }
     if (!rotinasConfig.julia) {
       ROTINAS_SEED.julia.forEach(item => REF_CONFIG.child('julia').push(item));
+    }
+    if (!rotinasConfig.luana) {
+      ROTINAS_SEED.luana.forEach(item => REF_CONFIG.child('luana').push(item));
     }
     renderTabs();
     if (tabAtiva === 'rotina') renderConteudo();

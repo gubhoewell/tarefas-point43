@@ -136,20 +136,38 @@ const JULIA_ROTINA = [
   { desc: 'Atendimento FitzAp e Wellhub', periodo: '20h–22h', ordem: 11 },
 ];
 
+const ITENS_PADRAO = [
+  { desc: 'Verificar FitzAp e responder todos os atendimentos pendentes (vendas, suporte, solicitações)', periodo: 'Dia todo' },
+  { desc: 'Manter FitzAp acompanhado durante todo o dia, respondendo novos atendimentos conforme chegam', periodo: 'Dia todo' },
+  { desc: 'Trabalhar carteira de clientes — indicações, contatos e campanhas para geração de leads', periodo: 'Dia todo' },
+];
+
 async function seedJulia() {
   linha('Limpando rotina antiga da Júlia...', 'info');
   await firebase.database().ref('rotinas_config/julia').remove();
-  for (const item of JULIA_ROTINA) {
+  const todosItens = [...JULIA_ROTINA, ...ITENS_PADRAO.map((it, i) => ({ ...it, ordem: JULIA_ROTINA.length + i + 1 }))];
+  for (const item of todosItens) {
     await firebase.database().ref('rotinas_config/julia').push(item);
   }
-  linha(`✓ ${JULIA_ROTINA.length} itens da rotina da Júlia inseridos!`, 'ok');
+  linha(`✓ ${todosItens.length} itens da rotina da Júlia inseridos!`, 'ok');
+  linha('Pode fechar esta aba.', 'ok');
+}
+
+async function seedLuana() {
+  linha('Criando rotina da Luana...', 'info');
+  await firebase.database().ref('rotinas_config/luana').remove();
+  for (const [i, item] of ITENS_PADRAO.entries()) {
+    await firebase.database().ref('rotinas_config/luana').push({ ...item, ordem: i + 1 });
+  }
+  linha(`✓ ${ITENS_PADRAO.length} itens da rotina da Luana inseridos!`, 'ok');
   linha('Pode fechar esta aba.', 'ok');
 }
 
 seed();
 </script>
-<button onclick="seedJulia()" style="margin-top:2rem;padding:10px 20px;background:#c9a84c;color:#000;border:none;border-radius:6px;font-size:15px;cursor:pointer;font-weight:bold">
-  ▶ Forçar rotina da Júlia
-</button>
+<div style="display:flex;gap:12px;margin-top:2rem;flex-wrap:wrap">
+  <button onclick="seedJulia()" style="padding:10px 20px;background:#c9a84c;color:#000;border:none;border-radius:6px;font-size:15px;cursor:pointer;font-weight:bold">▶ Forçar rotina da Júlia</button>
+  <button onclick="seedLuana()" style="padding:10px 20px;background:#5a9e5a;color:#000;border:none;border-radius:6px;font-size:15px;cursor:pointer;font-weight:bold">▶ Forçar rotina da Luana</button>
+</div>
 </body>
 </html>

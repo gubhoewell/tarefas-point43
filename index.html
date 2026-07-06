@@ -437,7 +437,10 @@
     user-select: none;
   }
   .rotina-item:hover { border-color: #333; }
+  .rotina-item.drag-over { border-color: #c9a84c; background: #1e1a0f; }
   .rotina-item.feito { opacity: 0.45; }
+  .drag-handle { color: #444; font-size: 16px; cursor: grab; padding: 0 6px 0 0; user-select: none; }
+  .drag-handle:active { cursor: grabbing; }
   .rotina-item.feito:hover { opacity: 0.65; }
   .rotina-check {
     width: 22px; height: 22px; min-width: 22px;
@@ -888,12 +891,16 @@ function renderRotina() {
             <div class="rotina-barra-wrap" style="max-width:100px"><div class="rotina-barra" style="width:${pct}%"></div></div>
             ${isCeo ? `<button class="btn-limpar" onclick="abrirModalRotina('${u.id}', null)" style="margin-left:auto;font-size:12px">+ Item</button>` : ''}
           </div>
-          <div>
+          <div class="rotina-lista" data-userid="${u.id}">
             ${itens.map(item => {
               const feito = !!statusHoje[item.id];
               return `
-              <div class="rotina-item ${feito ? 'feito' : ''}" style="cursor:default">
-                <div class="rotina-check ${feito ? '' : ''}" style="cursor:default"></div>
+              <div class="rotina-item ${feito ? 'feito' : ''}" style="cursor:default"
+                draggable="${isCeo ? 'true' : 'false'}"
+                data-itemid="${item.id}" data-userid="${u.id}"
+                ondragstart="dragStart(event)" ondragover="dragOver(event)" ondrop="dragDrop(event)" ondragend="dragEnd(event)">
+                ${isCeo ? `<span class="drag-handle" title="Arrastar">⠿</span>` : ''}
+                <div class="rotina-check" style="cursor:default"></div>
                 <div style="flex:1">
                   <div class="rotina-desc">${item.desc}</div>
                   <div class="rotina-periodo">${item.periodo || ''}</div>
@@ -929,10 +936,15 @@ function renderRotina() {
     </div>
     <div>`;
 
+  html = html.replace('<div>', '<div class="rotina-lista" data-userid="' + usuarioAtual + '">');
   for (const item of itens) {
     const feito = !!statusHoje[item.id];
     html += `
-      <div class="rotina-item ${feito ? 'feito' : ''}" onclick="toggleRotina('${usuarioAtual}','${item.id}',${feito})">
+      <div class="rotina-item ${feito ? 'feito' : ''}"
+        draggable="true" data-itemid="${item.id}" data-userid="${usuarioAtual}"
+        ondragstart="dragStart(event)" ondragover="dragOver(event)" ondrop="dragDrop(event)" ondragend="dragEnd(event)"
+        onclick="toggleRotina('${usuarioAtual}','${item.id}',${feito})">
+        <span class="drag-handle" title="Arrastar" onclick="event.stopPropagation()">⠿</span>
         <div class="rotina-check"></div>
         <div>
           <div class="rotina-desc">${item.desc}</div>
@@ -942,6 +954,47 @@ function renderRotina() {
   }
   html += '</div>';
   document.getElementById('conteudo').innerHTML = html;
+}
+
+let dragSrcId = null;
+let dragSrcUser = null;
+
+function dragStart(e) {
+  dragSrcId = e.currentTarget.dataset.itemid;
+  dragSrcUser = e.currentTarget.dataset.userid;
+  e.currentTarget.style.opacity = '0.4';
+  e.dataTransfer.effectAllowed = 'move';
+}
+
+function dragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  document.querySelectorAll('.rotina-item.drag-over').forEach(el => el.classList.remove('drag-over'));
+  const target = e.currentTarget;
+  if (target.dataset.itemid !== dragSrcId) target.classList.add('drag-over');
+}
+
+function dragEnd(e) {
+  e.currentTarget.style.opacity = '';
+  document.querySelectorAll('.rotina-item.drag-over').forEach(el => el.classList.remove('drag-over'));
+}
+
+function dragDrop(e) {
+  e.preventDefault();
+  const targetId = e.currentTarget.dataset.itemid;
+  const targetUser = e.currentTarget.dataset.userid;
+  if (dragSrcId === targetId || dragSrcUser !== targetUser) return;
+
+  const itens = itensOrdenados(targetUser);
+  const srcIdx = itens.findIndex(i => i.id === dragSrcId);
+  const tgtIdx = itens.findIndex(i => i.id === targetId);
+  itens.splice(tgtIdx, 0, itens.splice(srcIdx, 1)[0]);
+
+  const updates = {};
+  itens.forEach((item, i) => {
+    updates[`rotinas_config/${targetUser}/${item.id}/ordem`] = i + 1;
+  });
+  DB.ref().update(updates);
 }
 
 function toggleRotina(userId, itemId, atual) {

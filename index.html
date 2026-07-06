@@ -437,7 +437,8 @@
     user-select: none;
   }
   .rotina-item:hover { border-color: #333; }
-  .rotina-item.drag-over { border-color: #c9a84c; background: #1e1a0f; }
+  .rotina-item.drag-over-item { border-color: #c9a84c; background: #1e1a0f; }
+  .rotina-grupo.drag-over-grupo { border-color: #c9a84c; background: #1a1800; }
   .rotina-item.feito { opacity: 0.45; }
   .drag-handle { color: #444; font-size: 16px; cursor: grab; padding: 0 6px 0 0; user-select: none; }
   .drag-handle:active { cursor: grabbing; }
@@ -876,16 +877,15 @@ function itensOrdenados(userId) {
     .sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
 }
 
-function renderItemRotina(item, userId, statusHoje, isCeo, draggable = true) {
+function renderItemRotina(item, userId, statusHoje, isCeo, draggable = true, dentroGrupo = false) {
   const feito = !!statusHoje[item.id];
+  const dragAttrs = draggable ? `draggable="true" data-itemid="${item.id}" data-userid="${userId}" data-dragtype="item" data-grupo="${item.grupo || ''}"
+    ondragstart="dragStart(event)" ondragover="dragOverItem(event)" ondrop="dragDropItem(event)" ondragend="dragEnd(event)"` : '';
   return `
-    <div class="rotina-item ${feito ? 'feito' : ''}"
-      ${draggable ? `draggable="true" data-itemid="${item.id}" data-userid="${userId}"
-      ondragstart="dragStart(event)" ondragover="dragOver(event)" ondrop="dragDrop(event)" ondragend="dragEnd(event)"` : ''}
-      style="${!draggable ? 'cursor:default' : ''}">
+    <div class="rotina-item ${feito ? 'feito' : ''} ${dentroGrupo ? 'dentro-grupo' : ''}" ${dragAttrs}>
       ${draggable ? `<span class="drag-handle" title="Arrastar">⠿</span>` : ''}
-      <div class="rotina-check" onclick="toggleRotina('${userId}','${item.id}',${feito})" style="cursor:pointer${!draggable ? ';cursor:default' : ''}"></div>
-      <div onclick="${draggable ? `toggleRotina('${userId}','${item.id}',${feito})` : ''}" style="flex:1;${draggable ? 'cursor:pointer' : 'cursor:default'}">
+      <div class="rotina-check" onclick="toggleRotina('${userId}','${item.id}',${feito})" style="cursor:pointer"></div>
+      <div onclick="toggleRotina('${userId}','${item.id}',${feito})" style="flex:1;cursor:pointer">
         <div class="rotina-desc">${item.desc}</div>
         <div class="rotina-periodo">${item.periodo || ''}</div>
       </div>
@@ -896,31 +896,48 @@ function renderItemRotina(item, userId, statusHoje, isCeo, draggable = true) {
     </div>`;
 }
 
-function renderGruposRotina(itens, userId, statusHoje, isCeo, draggable = true) {
-  const semGrupo = itens.filter(i => !i.grupo);
+function buildSlots(itens) {
+  const slots = [];
   const grupos = {};
-  itens.filter(i => i.grupo).forEach(i => {
-    if (!grupos[i.grupo]) grupos[i.grupo] = [];
-    grupos[i.grupo].push(i);
-  });
+  for (const item of itens) {
+    if (!item.grupo) {
+      slots.push({ type: 'item', pos: item.ordem || 0, item });
+    } else {
+      if (!grupos[item.grupo]) grupos[item.grupo] = [];
+      grupos[item.grupo].push(item);
+    }
+  }
+  for (const [nome, gitens] of Object.entries(grupos)) {
+    const pos = Math.min(...gitens.map(i => i.ordem || 0));
+    slots.push({ type: 'grupo', pos, nome, itens: gitens.sort((a, b) => (a.ordemInterna || a.ordem || 0) - (b.ordemInterna || b.ordem || 0)) });
+  }
+  slots.sort((a, b) => a.pos - b.pos);
+  return slots;
+}
 
+function renderGruposRotina(itens, userId, statusHoje, isCeo, draggable = true) {
+  const slots = buildSlots(itens);
   let html = '';
-
-  // itens sem grupo primeiro
-  html += semGrupo.map(i => renderItemRotina(i, userId, statusHoje, isCeo, draggable)).join('');
-
-  // grupos colapsáveis
-  for (const [nomeGrupo, gitens] of Object.entries(grupos)) {
-    const feitosGrupo = gitens.filter(i => statusHoje[i.id]).length;
-    const completo = feitosGrupo === gitens.length;
-    html += `
-      <details class="rotina-grupo" ${completo ? '' : 'open'}>
-        <summary class="rotina-grupo-header">
-          <span class="rotina-grupo-nome">${nomeGrupo}</span>
-          <span class="rotina-grupo-pct ${completo ? 'completo' : ''}">${feitosGrupo}/${gitens.length}${completo ? ' ✓' : ''}</span>
-        </summary>
-        ${gitens.map(i => renderItemRotina(i, userId, statusHoje, isCeo, draggable)).join('')}
-      </details>`;
+  for (const slot of slots) {
+    if (slot.type === 'item') {
+      html += renderItemRotina(slot.item, userId, statusHoje, isCeo, draggable);
+    } else {
+      const feitosGrupo = slot.itens.filter(i => statusHoje[i.id]).length;
+      const completo = feitosGrupo === slot.itens.length;
+      const dragGrupoAttrs = draggable ? `draggable="true" data-grupo="${slot.nome}" data-userid="${userId}" data-dragtype="grupo"
+        ondragstart="dragStartGrupo(event)" ondragover="dragOverGrupo(event)" ondrop="dragDropGrupo(event)" ondragend="dragEnd(event)"` : '';
+      html += `
+        <details class="rotina-grupo" ${completo ? '' : 'open'} ${dragGrupoAttrs}>
+          <summary class="rotina-grupo-header">
+            ${draggable ? `<span class="drag-handle" title="Arrastar grupo">⠿</span>` : ''}
+            <span class="rotina-grupo-nome">${slot.nome}</span>
+            <span class="rotina-grupo-pct ${completo ? 'completo' : ''}">${feitosGrupo}/${slot.itens.length}${completo ? ' ✓' : ''}</span>
+          </summary>
+          <div class="rotina-grupo-itens" data-grupo="${slot.nome}" data-userid="${userId}">
+            ${slot.itens.map(i => renderItemRotina(i, userId, statusHoje, isCeo, draggable, true)).join('')}
+          </div>
+        </details>`;
+    }
   }
   return html;
 }
@@ -1001,41 +1018,110 @@ function renderRotina() {
 
 let dragSrcId = null;
 let dragSrcUser = null;
+let dragSrcGrupo = null;
 
 function dragStart(e) {
   dragSrcId = e.currentTarget.dataset.itemid;
   dragSrcUser = e.currentTarget.dataset.userid;
+  dragSrcGrupo = e.currentTarget.dataset.grupo || '';
   e.currentTarget.style.opacity = '0.4';
   e.dataTransfer.effectAllowed = 'move';
-}
-
-function dragOver(e) {
-  e.preventDefault();
-  e.dataTransfer.dropEffect = 'move';
-  document.querySelectorAll('.rotina-item.drag-over').forEach(el => el.classList.remove('drag-over'));
-  const target = e.currentTarget;
-  if (target.dataset.itemid !== dragSrcId) target.classList.add('drag-over');
+  e.stopPropagation();
 }
 
 function dragEnd(e) {
   e.currentTarget.style.opacity = '';
-  document.querySelectorAll('.rotina-item.drag-over').forEach(el => el.classList.remove('drag-over'));
+  document.querySelectorAll('.drag-over-item,.drag-over-grupo').forEach(el => {
+    el.classList.remove('drag-over-item', 'drag-over-grupo');
+  });
 }
 
-function dragDrop(e) {
+// ── Drag de ITENS individuais (dentro ou fora de grupo) ──
+function dragOverItem(e) {
   e.preventDefault();
+  e.stopPropagation();
+  const target = e.currentTarget;
+  if (target.dataset.itemid === dragSrcId) return;
+  if (target.dataset.grupo !== dragSrcGrupo) return;
+  document.querySelectorAll('.drag-over-item').forEach(el => el.classList.remove('drag-over-item'));
+  target.classList.add('drag-over-item');
+}
+
+function dragDropItem(e) {
+  e.preventDefault();
+  e.stopPropagation();
   const targetId = e.currentTarget.dataset.itemid;
   const targetUser = e.currentTarget.dataset.userid;
-  if (dragSrcId === targetId || dragSrcUser !== targetUser) return;
+  const targetGrupo = e.currentTarget.dataset.grupo || '';
+  if (dragSrcId === targetId || dragSrcUser !== targetUser || targetGrupo !== dragSrcGrupo) return;
 
   const itens = itensOrdenados(targetUser);
-  const srcIdx = itens.findIndex(i => i.id === dragSrcId);
-  const tgtIdx = itens.findIndex(i => i.id === targetId);
-  itens.splice(tgtIdx, 0, itens.splice(srcIdx, 1)[0]);
 
+  if (!dragSrcGrupo) {
+    // fora de grupo — reordena por `ordem` global
+    const slots = buildSlots(itens);
+    const srcSlotIdx = slots.findIndex(s => s.type === 'item' && s.item.id === dragSrcId);
+    const tgtSlotIdx = slots.findIndex(s => s.type === 'item' && s.item.id === targetId);
+    if (srcSlotIdx === -1 || tgtSlotIdx === -1) return;
+    slots.splice(tgtSlotIdx, 0, slots.splice(srcSlotIdx, 1)[0]);
+    salvarOrdemSlots(slots, targetUser);
+  } else {
+    // dentro de grupo — reordena por `ordemInterna`
+    const grupoItens = itens.filter(i => i.grupo === dragSrcGrupo)
+      .sort((a, b) => (a.ordemInterna || a.ordem || 0) - (b.ordemInterna || b.ordem || 0));
+    const srcIdx = grupoItens.findIndex(i => i.id === dragSrcId);
+    const tgtIdx = grupoItens.findIndex(i => i.id === targetId);
+    grupoItens.splice(tgtIdx, 0, grupoItens.splice(srcIdx, 1)[0]);
+    const updates = {};
+    grupoItens.forEach((item, i) => {
+      updates[`rotinas_config/${targetUser}/${item.id}/ordemInterna`] = i + 1;
+    });
+    DB.ref().update(updates);
+  }
+}
+
+// ── Drag de GRUPOS inteiros ──
+function dragStartGrupo(e) {
+  dragSrcGrupo = e.currentTarget.dataset.grupo;
+  dragSrcUser = e.currentTarget.dataset.userid;
+  dragSrcId = null;
+  e.currentTarget.style.opacity = '0.4';
+  e.dataTransfer.effectAllowed = 'move';
+}
+
+function dragOverGrupo(e) {
+  e.preventDefault();
+  const target = e.currentTarget;
+  if (target.dataset.grupo === dragSrcGrupo) return;
+  document.querySelectorAll('.drag-over-grupo').forEach(el => el.classList.remove('drag-over-grupo'));
+  target.classList.add('drag-over-grupo');
+}
+
+function dragDropGrupo(e) {
+  e.preventDefault();
+  const targetGrupo = e.currentTarget.dataset.grupo;
+  const targetUser = e.currentTarget.dataset.userid;
+  if (dragSrcGrupo === targetGrupo || dragSrcUser !== targetUser) return;
+
+  const itens = itensOrdenados(targetUser);
+  const slots = buildSlots(itens);
+  const srcIdx = slots.findIndex(s => s.type === 'grupo' && s.nome === dragSrcGrupo);
+  const tgtIdx = slots.findIndex(s => s.type === 'grupo' && s.nome === targetGrupo);
+  if (srcIdx === -1 || tgtIdx === -1) return;
+  slots.splice(tgtIdx, 0, slots.splice(srcIdx, 1)[0]);
+  salvarOrdemSlots(slots, targetUser);
+}
+
+function salvarOrdemSlots(slots, userId) {
   const updates = {};
-  itens.forEach((item, i) => {
-    updates[`rotinas_config/${targetUser}/${item.id}/ordem`] = i + 1;
+  slots.forEach((slot, i) => {
+    if (slot.type === 'item') {
+      updates[`rotinas_config/${userId}/${slot.item.id}/ordem`] = i + 1;
+    } else {
+      slot.itens.forEach(item => {
+        updates[`rotinas_config/${userId}/${item.id}/ordem`] = i + 1;
+      });
+    }
   });
   DB.ref().update(updates);
 }

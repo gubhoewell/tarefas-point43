@@ -442,6 +442,27 @@
   .rotina-item.feito { opacity: 0.45; }
   .drag-handle { color: #444; font-size: 16px; cursor: grab; padding: 0 6px 0 0; user-select: none; }
   .drag-handle:active { cursor: grabbing; }
+  /* ── PONTO ── */
+  .ponto-individual { display:flex; flex-direction:column; align-items:center; padding:2rem 1rem; gap:1rem; }
+  .ponto-relogio { font-size:48px; font-weight:700; color:#f0f0f0; letter-spacing:2px; }
+  .ponto-tempo-total { font-size:16px; color:#666; }
+  .ponto-btns { display:flex; gap:16px; margin-top:1rem; }
+  .btn-ponto { padding:18px 36px; border:none; border-radius:12px; font-size:20px; font-weight:700; cursor:pointer; transition:opacity .2s; }
+  .btn-ponto.entrada { background:#5a9e5a; color:#fff; }
+  .btn-ponto.saida { background:#c9a84c; color:#000; }
+  .btn-ponto.inativo { opacity:0.3; cursor:not-allowed; }
+  .ponto-historico-hoje { margin-top:1.5rem; width:100%; max-width:320px; display:flex; flex-direction:column; gap:8px; }
+  .ponto-reg { display:flex; align-items:center; gap:10px; font-size:15px; color:#aaa; }
+  .ponto-tag { padding:3px 10px; border-radius:20px; font-size:13px; font-weight:600; }
+  .ponto-tag.entrada { background:#1e3a1e; color:#5a9e5a; }
+  .ponto-tag.saida { background:#2a2000; color:#c9a84c; }
+  .ponto-ceo { display:flex; flex-direction:column; gap:4px; }
+  .ponto-data-header { font-size:12px; color:#555; font-weight:600; padding:12px 0 4px; text-transform:uppercase; letter-spacing:1px; border-top:1px solid #1a1a1a; margin-top:8px; }
+  .ponto-data-header:first-child { border-top:none; margin-top:0; }
+  .ponto-linha { display:flex; align-items:center; gap:10px; padding:8px 12px; background:#111; border-radius:8px; margin-bottom:4px; }
+  .ponto-nome { font-size:14px; color:#ccc; min-width:70px; }
+  .ponto-registros { display:flex; gap:6px; flex-wrap:wrap; flex:1; }
+  .ponto-total { font-size:13px; color:#c9a84c; font-weight:600; white-space:nowrap; }
   .rotina-grupo { border: 1px solid #2a2a2a; border-radius: 8px; margin-bottom: 8px; overflow: hidden; }
   .rotina-grupo-header { display: flex; align-items: center; gap: 10px; padding: 10px 14px; cursor: pointer; list-style: none; background: #161616; }
   .rotina-grupo-header::-webkit-details-marker { display: none; }
@@ -581,6 +602,7 @@ const DB = firebase.database();
 const REF = DB.ref('tarefas');
 const REF_ROTINA = DB.ref('rotina');
 const REF_CONFIG = DB.ref('rotinas_config');
+const REF_PONTO = DB.ref('ponto');
 
 // Seed inicial da Emilly — só usado se o banco estiver vazio
 const ROTINAS_SEED = {
@@ -647,6 +669,8 @@ let tarefas = {};
 let rotinaHoje = {};
 let rotinasConfig = {};
 let tabAtiva = 'minhas';
+let pontoHoje = {};
+let pontoHistorico = {};
 let filtroStatus = 'todas';
 let editandoRotinaId = null;
 let editandoRotinaUser = null;
@@ -712,6 +736,7 @@ function renderTabs() {
     { id: 'minhas', label: `Minhas tarefas${badge}` },
     ...(temRotina || u.gestor ? [{ id: 'rotina', label: 'Rotina diária' }] : []),
     { id: 'geral', label: 'Visão geral' },
+    { id: 'ponto', label: 'Ponto' },
   ];
   document.getElementById('tabs').innerHTML = tabs.map(t => `
     <div class="tab ${tabAtiva === t.id ? 'ativo' : ''}" onclick="mudarTab('${t.id}')">${t.label}</div>
@@ -766,12 +791,21 @@ function escutarTarefas() {
     renderTabs();
     if (tabAtiva === 'rotina') renderConteudo();
   });
+  REF_PONTO.child(hoje()).on('value', snap => {
+    pontoHoje = snap.val() || {};
+    if (tabAtiva === 'ponto') renderConteudo();
+  });
+  REF_PONTO.on('value', snap => {
+    pontoHistorico = snap.val() || {};
+    if (tabAtiva === 'ponto') renderConteudo();
+  });
 }
 
 // ── RENDERIZAÇÃO ──
 function renderConteudo() {
   if (tabAtiva === 'minhas') renderMinhas();
   else if (tabAtiva === 'rotina') renderRotina();
+  else if (tabAtiva === 'ponto') renderPonto();
   else renderGeral();
 }
 
@@ -1124,6 +1158,84 @@ function salvarOrdemSlots(slots, userId) {
     }
   });
   DB.ref().update(updates);
+}
+
+// ── PONTO ──
+function horaAgora() {
+  return new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+
+function calcularTempo(registros) {
+  const lista = Object.values(registros).sort((a, b) => a.timestamp - b.timestamp);
+  let total = 0, entrada = null;
+  for (const r of lista) {
+    if (r.tipo === 'entrada') entrada = r.timestamp;
+    else if (r.tipo === 'saida' && entrada) { total += r.timestamp - entrada; entrada = null; }
+  }
+  if (entrada) total += Date.now() - entrada;
+  const h = Math.floor(total / 3600000);
+  const m = Math.floor((total % 3600000) / 60000);
+  return `${h}h${m.toString().padStart(2,'0')}`;
+}
+
+function batePonto(tipo) {
+  REF_PONTO.child(hoje()).child(usuarioAtual).push({
+    tipo, hora: horaAgora(), timestamp: Date.now()
+  });
+}
+
+function renderPonto() {
+  const isCeo = usuarioAtual === 'gustavo';
+  const c = document.getElementById('conteudo');
+
+  if (isCeo) {
+    // ── Visão CEO: histórico de todos ──
+    const datas = Object.keys(pontoHistorico).sort().reverse().slice(0, 14);
+    let html = '<div class="ponto-ceo">';
+    for (const data of datas) {
+      const [ano, mes, dia] = data.split('-');
+      html += `<div class="ponto-data-header">${dia}/${mes}/${ano}</div>`;
+      for (const u of USUARIOS.filter(u => !u.gestor)) {
+        const regs = pontoHistorico[data]?.[u.id];
+        if (!regs) continue;
+        const lista = Object.values(regs).sort((a, b) => a.timestamp - b.timestamp);
+        const tempo = calcularTempo(regs);
+        html += `<div class="ponto-linha">
+          <div class="pessoa-avatar-sm" style="width:28px;height:28px;font-size:11px">${iniciais(u.nome)}</div>
+          <span class="ponto-nome">${u.nome}</span>
+          <span class="ponto-registros">${lista.map(r => `<span class="ponto-tag ${r.tipo}">${r.tipo === 'entrada' ? '↓' : '↑'} ${r.hora}</span>`).join('')}</span>
+          <span class="ponto-total">${tempo}</span>
+        </div>`;
+      }
+    }
+    html += '</div>';
+    c.innerHTML = html;
+    return;
+  }
+
+  // ── Visão individual ──
+  const meusRegs = (pontoHoje[usuarioAtual] ? Object.values(pontoHoje[usuarioAtual]) : [])
+    .sort((a, b) => a.timestamp - b.timestamp);
+  const ultimo = meusRegs[meusRegs.length - 1];
+  const dentroJornada = ultimo?.tipo === 'entrada';
+  const tempo = pontoHoje[usuarioAtual] ? calcularTempo(pontoHoje[usuarioAtual]) : '0h00';
+
+  c.innerHTML = `
+    <div class="ponto-individual">
+      <div class="ponto-relogio">${horaAgora()}</div>
+      <div class="ponto-tempo-total">${tempo} hoje</div>
+      <div class="ponto-btns">
+        <button class="btn-ponto entrada ${dentroJornada ? 'inativo' : ''}" onclick="batePonto('entrada')" ${dentroJornada ? 'disabled' : ''}>↓ Entrada</button>
+        <button class="btn-ponto saida ${!dentroJornada ? 'inativo' : ''}" onclick="batePonto('saida')" ${!dentroJornada ? 'disabled' : ''}>↑ Saída</button>
+      </div>
+      <div class="ponto-historico-hoje">
+        ${meusRegs.length === 0 ? '<div class="vazio" style="margin-top:1rem">Nenhum registro hoje</div>' :
+          meusRegs.map(r => `<div class="ponto-reg"><span class="ponto-tag ${r.tipo}">${r.tipo === 'entrada' ? '↓ Entrada' : '↑ Saída'}</span> ${r.hora}</div>`).join('')}
+      </div>
+    </div>`;
+
+  // atualiza relógio a cada minuto
+  setTimeout(() => { if (tabAtiva === 'ponto') renderPonto(); }, 60000 - (Date.now() % 60000));
 }
 
 function toggleRotina(userId, itemId, atual) {

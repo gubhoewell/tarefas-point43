@@ -1185,17 +1185,22 @@ function batePonto(tipo) {
 }
 
 function renderPonto() {
+  const u = usuario(usuarioAtual);
   const isCeo = usuarioAtual === 'gustavo';
+  const isGestor = u.gestor;
   const c = document.getElementById('conteudo');
 
-  if (isCeo) {
-    // ── Visão CEO: histórico de todos ──
+  if (isGestor) {
+    // ── Visão gestores: histórico do time operacional ──
+    const visíveis = isCeo
+      ? USUARIOS.filter(u => !u.gestor)
+      : USUARIOS.filter(u => !u.gestor); // Bene e Mateus veem o mesmo time
     const datas = Object.keys(pontoHistorico).sort().reverse().slice(0, 14);
     let html = '<div class="ponto-ceo">';
     for (const data of datas) {
       const [ano, mes, dia] = data.split('-');
       html += `<div class="ponto-data-header">${dia}/${mes}/${ano}</div>`;
-      for (const u of USUARIOS.filter(u => !u.gestor)) {
+      for (const u of visíveis) {
         const regs = pontoHistorico[data]?.[u.id];
         if (!regs) continue;
         const lista = Object.values(regs).sort((a, b) => a.timestamp - b.timestamp);

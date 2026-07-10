@@ -463,6 +463,12 @@
   .ponto-nome { font-size:14px; color:#ccc; min-width:70px; }
   .ponto-registros { display:flex; gap:6px; flex-wrap:wrap; flex:1; }
   .ponto-total { font-size:13px; color:#c9a84c; font-weight:600; white-space:nowrap; }
+  .ponto-relatorio { margin-top:2rem; width:100%; max-width:420px; border:1px solid #1e1e1e; border-radius:12px; overflow:hidden; }
+  .ponto-relatorio-header { display:flex; justify-content:space-between; align-items:center; padding:12px 16px; background:#161616; font-size:13px; font-weight:600; color:#aaa; }
+  .ponto-hist-linha { display:flex; align-items:center; gap:10px; padding:8px 16px; border-top:1px solid #1a1a1a; }
+  .ponto-hist-data { font-size:13px; color:#555; min-width:36px; }
+  .ponto-hist-regs { display:flex; gap:5px; flex-wrap:wrap; flex:1; }
+  .ponto-hist-total { font-size:13px; color:#c9a84c; font-weight:600; white-space:nowrap; }
   .rotina-grupo { border: 1px solid #2a2a2a; border-radius: 8px; margin-bottom: 8px; overflow: hidden; }
   .rotina-grupo-header { display: flex; align-items: center; gap: 10px; padding: 10px 14px; cursor: pointer; list-style: none; background: #161616; }
   .rotina-grupo-header::-webkit-details-marker { display: none; }
@@ -1173,9 +1179,7 @@ function calcularTempo(registros) {
     else if (r.tipo === 'saida' && entrada) { total += r.timestamp - entrada; entrada = null; }
   }
   if (entrada) total += Date.now() - entrada;
-  const h = Math.floor(total / 3600000);
-  const m = Math.floor((total % 3600000) / 60000);
-  return `${h}h${m.toString().padStart(2,'0')}`;
+  return msParaHora(total);
 }
 
 function batePonto(tipo) {
@@ -1225,6 +1229,31 @@ function renderPonto() {
   const dentroJornada = ultimo?.tipo === 'entrada';
   const tempo = pontoHoje[usuarioAtual] ? calcularTempo(pontoHoje[usuarioAtual]) : '0h00';
 
+  // histórico pessoal — últimos 30 dias
+  const mesAtual = hoje().slice(0, 7);
+  const datasDoMes = Object.keys(pontoHistorico)
+    .filter(d => d.slice(0, 7) === mesAtual && d !== hoje())
+    .sort().reverse();
+
+  let totalMesMs = 0;
+  let historicoHTML = '';
+  for (const data of datasDoMes) {
+    const regs = pontoHistorico[data]?.[usuarioAtual];
+    if (!regs) continue;
+    const lista = Object.values(regs).sort((a, b) => a.timestamp - b.timestamp);
+    const ms = calcularTempoMs(regs);
+    totalMesMs += ms;
+    const [ano, mes, dia] = data.split('-');
+    historicoHTML += `
+      <div class="ponto-hist-linha">
+        <span class="ponto-hist-data">${dia}/${mes}</span>
+        <span class="ponto-hist-regs">${lista.map(r => `<span class="ponto-tag ${r.tipo}">${r.tipo === 'entrada' ? '↓' : '↑'} ${r.hora}</span>`).join('')}</span>
+        <span class="ponto-hist-total">${msParaHora(ms)}</span>
+      </div>`;
+  }
+
+  const totalMes = msParaHora(totalMesMs);
+
   c.innerHTML = `
     <div class="ponto-individual">
       <div class="ponto-relogio">${horaAgora()}</div>
@@ -1237,10 +1266,33 @@ function renderPonto() {
         ${meusRegs.length === 0 ? '<div class="vazio" style="margin-top:1rem">Nenhum registro hoje</div>' :
           meusRegs.map(r => `<div class="ponto-reg"><span class="ponto-tag ${r.tipo}">${r.tipo === 'entrada' ? '↓ Entrada' : '↑ Saída'}</span> ${r.hora}</div>`).join('')}
       </div>
+      ${historicoHTML ? `
+        <div class="ponto-relatorio">
+          <div class="ponto-relatorio-header">
+            <span>Histórico do mês</span>
+            <span class="ponto-total">Total: ${totalMes}</span>
+          </div>
+          ${historicoHTML}
+        </div>` : ''}
     </div>`;
 
-  // atualiza relógio a cada minuto
   setTimeout(() => { if (tabAtiva === 'ponto') renderPonto(); }, 60000 - (Date.now() % 60000));
+}
+
+function calcularTempoMs(registros) {
+  const lista = Object.values(registros).sort((a, b) => a.timestamp - b.timestamp);
+  let total = 0, entrada = null;
+  for (const r of lista) {
+    if (r.tipo === 'entrada') entrada = r.timestamp;
+    else if (r.tipo === 'saida' && entrada) { total += r.timestamp - entrada; entrada = null; }
+  }
+  return total;
+}
+
+function msParaHora(ms) {
+  const h = Math.floor(ms / 3600000);
+  const m = Math.floor((ms % 3600000) / 60000);
+  return `${h}h${m.toString().padStart(2,'0')}`;
 }
 
 function toggleRotina(userId, itemId, atual) {

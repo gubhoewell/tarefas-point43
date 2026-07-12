@@ -613,6 +613,38 @@ const REF = DB.ref('tarefas');
 const REF_ROTINA = DB.ref('rotina');
 const REF_CONFIG = DB.ref('rotinas_config');
 const REF_PONTO = DB.ref('ponto');
+const REF_PLANTAO_CONFIG = DB.ref('plantao_config');
+const REF_PLANTAO = DB.ref('plantao');
+
+// Seed do Plantão — 26 itens consolidados sem duplicatas
+const PLANTAO_SEED = [
+  { desc: 'Verificar grupo Wellhub e validar tokens', periodo: '08h–11h', ordem: 1 },
+  { desc: 'Adicionar créditos Wellhub/Totalpass do dia anterior', periodo: '08h–11h', ordem: 2 },
+  { desc: 'Acessar e-mail, filtrar cancelamentos e organizar caixa de entrada', periodo: '08h–11h', ordem: 3 },
+  { desc: 'Enviar print dos cancelamentos no grupo interno', periodo: '08h–11h', ordem: 4 },
+  { desc: 'Encaminhar e-mail padrão para cada aluno que solicitou cancelamento', periodo: '08h–11h', ordem: 5 },
+  { desc: 'Abrir atendimento individual para cancelamentos e buscar reversão', periodo: '08h–11h', ordem: 6 },
+  { desc: 'Após cancelamento, alterar etiqueta de Lead para Ex-aluno', periodo: '08h–11h', ordem: 7 },
+  { desc: 'Realizar renovações e efetuar transações dos planos', periodo: '08h–11h', ordem: 8 },
+  { desc: 'Conferir contratos com vencimento do dia e renovar', periodo: '08h–11h', ordem: 9 },
+  { desc: 'Verificar contratos com vencimento em até 3 dias', periodo: '08h–11h', ordem: 10 },
+  { desc: 'Planejamento do dia', periodo: '08h–11h', ordem: 11 },
+  { desc: 'Divulgar campanha diária nos grupos de WhatsApp', periodo: '08h–11h', ordem: 12 },
+  { desc: 'Disparar campanha em massa no FitzAp', periodo: '08h–11h', ordem: 13 },
+  { desc: 'Verificar FitzAp e responder todos os atendimentos pendentes', periodo: 'Dia todo', ordem: 14 },
+  { desc: 'Manter FitzAp acompanhado durante todo o dia', periodo: 'Dia todo', ordem: 15 },
+  { desc: 'Trabalhar carteira de clientes — indicações e campanhas', periodo: 'Dia todo', ordem: 16 },
+  { desc: 'Ativar leads — abrir e fechar com campanha', periodo: 'Dia todo', ordem: 17 },
+  { desc: 'Tratar alunos bloqueados', periodo: 'Dia todo', ordem: 18 },
+  { desc: 'Verificar fila das aulas e abrir novas aulas', periodo: '11h', ordem: 19 },
+  { desc: 'Verificar atendimentos e grupos — pendências de professores', periodo: '11h30', ordem: 20 },
+  { desc: 'Ajustar agenda e divulgar as aulas', periodo: '12h', ordem: 21 },
+  { desc: 'Organização do café e recepção (varrer e limpar)', periodo: '16h', ordem: 22 },
+  { desc: 'Divulgar aula do período da manhã', periodo: '18h', ordem: 23 },
+  { desc: 'Divulgar link de avaliação nos grupos', periodo: '19h', ordem: 24 },
+  { desc: 'Atendimento presencial na recepção', periodo: 'A partir das 16h', ordem: 25 },
+  { desc: 'Lançar vendas do dia anterior no sistema de games', periodo: 'Dia todo', ordem: 26 },
+];
 
 // Seed inicial da Emilly — só usado se o banco estiver vazio
 const ROTINAS_SEED = {
@@ -747,6 +779,7 @@ function renderTabs() {
   const tabs = [
     { id: 'minhas', label: `Minhas tarefas${badge}` },
     ...(temRotina || u.gestor ? [{ id: 'rotina', label: 'Rotina diária' }] : []),
+    { id: 'plantao', label: '🔄 Plantão' },
     { id: 'geral', label: 'Visão geral' },
     { id: 'ponto', label: 'Ponto' },
   ];
@@ -811,12 +844,24 @@ function escutarTarefas() {
     pontoHistorico = snap.val() || {};
     if (tabAtiva === 'ponto') renderConteudo();
   });
+  REF_PLANTAO_CONFIG.on('value', snap => {
+    plantaoConfig = snap.val() || {};
+    if (!Object.keys(plantaoConfig).length) {
+      PLANTAO_SEED.forEach(item => REF_PLANTAO_CONFIG.push(item));
+    }
+    if (tabAtiva === 'plantao') renderConteudo();
+  });
+  REF_PLANTAO.child(hoje()).on('value', snap => {
+    plantaoHoje = snap.val() || {};
+    if (tabAtiva === 'plantao') renderConteudo();
+  });
 }
 
 // ── RENDERIZAÇÃO ──
 function renderConteudo() {
   if (tabAtiva === 'minhas') renderMinhas();
   else if (tabAtiva === 'rotina') renderRotina();
+  else if (tabAtiva === 'plantao') renderPlantao();
   else if (tabAtiva === 'ponto') renderPonto();
   else renderGeral();
 }
@@ -923,6 +968,59 @@ function itensOrdenados(userId) {
     .map(([id, v]) => ({ id, ...v }))
     .filter(item => !item.expira || item.expira >= hj)
     .sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
+}
+
+function plantaoOrdenado() {
+  return Object.entries(plantaoConfig)
+    .map(([id, v]) => ({ id, ...v }))
+    .sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
+}
+
+function renderPlantao() {
+  const isCeo = usuarioAtual === 'gustavo';
+  const itens = plantaoOrdenado();
+  const feitos = itens.filter(i => plantaoHoje[i.id]).length;
+  const pct = itens.length ? Math.round((feitos / itens.length) * 100) : 0;
+  const [ano, mes, dia] = hoje().split('-');
+  let html = `
+    <div style="margin-bottom:1.25rem">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+        <div>
+          <div style="font-size:13px;color:#555;margin-bottom:2px">PLANTÃO DO DIA — ${dia}/${mes}/${ano}</div>
+          <div style="font-size:14px;color:#888">${feitos} de ${itens.length} itens concluídos</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div class="rotina-barra-wrap" style="width:120px"><div class="rotina-barra" style="width:${pct}%"></div></div>
+          <span style="font-size:14px;color:#888">${pct}%</span>
+          ${isCeo ? `<button class="btn-nova" style="margin:0;padding:8px 16px;font-size:14px" onclick="abrirModalPlantao(null)">+ Item</button>` : ''}
+        </div>
+      </div>
+      ${isCeo ? `<div style="font-size:12px;color:#444;margin-top:8px">CEO: clique ✎ para editar, × para remover. Alterações valem para todos os dias.</div>` : ''}
+    </div>
+    <div>`;
+
+  if (itens.length === 0) {
+    html += '<div class="vazio">Nenhum item de plantão cadastrado.</div>';
+  } else {
+    for (const item of itens) {
+      const feito = !!plantaoHoje[item.id];
+      html += `
+        <div class="rotina-item ${feito ? 'feito' : ''}" onclick="togglePlantao('${item.id}',${feito})">
+          <div class="rotina-check" style="cursor:pointer"></div>
+          <div style="flex:1;cursor:pointer">
+            <div class="rotina-desc">${item.desc}</div>
+            <div class="rotina-periodo">${item.periodo || ''}</div>
+          </div>
+          ${isCeo ? `
+            <button class="btn-editar" onclick="event.stopPropagation();abrirModalPlantao('${item.id}')" title="Editar">✎</button>
+            <button class="btn-excluir" onclick="event.stopPropagation();removerItemPlantao('${item.id}')">×</button>
+          ` : ''}
+        </div>`;
+    }
+  }
+
+  html += '</div>';
+  document.getElementById('conteudo').innerHTML = html;
 }
 
 function renderItemRotina(item, userId, statusHoje, isCeo, draggable = true, dentroGrupo = false) {

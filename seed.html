@@ -122,7 +122,145 @@ async function seed() {
   }
 }
 
-seed();
+const JULIA_ROTINA = [
+  { desc: 'Adicionar créditos para alunos Wellhub', periodo: '11h', ordem: 1 },
+  { desc: 'Verificar fila das aulas e aulas vazias / abrir novas aulas', periodo: '11h15', ordem: 2 },
+  { desc: 'Verificar atendimentos e grupos — pendências de professores + Wellhub em paralelo', periodo: '11h30', ordem: 3 },
+  { desc: 'Ajustar agenda e divulgar as aulas', periodo: '12h', ordem: 4 },
+  { desc: 'Atendimentos FitzAp e grupos — solicitações de alunos', periodo: '12h30', ordem: 5 },
+  { desc: 'Finalizar atendimentos da manhã', periodo: '13h', ordem: 6 },
+  { desc: 'Organização do café e recepção (varrer e limpar)', periodo: '16h', ordem: 7 },
+  { desc: 'Grupos e munhequeiras + Wellhub e FitzAp em paralelo', periodo: '17h', ordem: 8 },
+  { desc: 'Divulgar aula do período da manhã e atendimentos', periodo: '18h', ordem: 9 },
+  { desc: 'Divulgar link de avaliação nos grupos', periodo: '19h', ordem: 10 },
+  { desc: 'Atendimento FitzAp e Wellhub', periodo: '20h–22h', ordem: 11 },
+];
+
+const ITENS_PADRAO = [
+  { desc: 'Verificar FitzAp e responder todos os atendimentos pendentes (vendas, suporte, solicitações)', periodo: 'Dia todo' },
+  { desc: 'Manter FitzAp acompanhado durante todo o dia, respondendo novos atendimentos conforme chegam', periodo: 'Dia todo' },
+  { desc: 'Trabalhar carteira de clientes — indicações, contatos e campanhas para geração de leads', periodo: 'Dia todo' },
+];
+
+async function seedJulia() {
+  linha('Limpando rotina antiga da Júlia...', 'info');
+  await firebase.database().ref('rotinas_config/julia').remove();
+  const todosItens = [...JULIA_ROTINA, ...ITENS_PADRAO.map((it, i) => ({ ...it, ordem: JULIA_ROTINA.length + i + 1 }))];
+  for (const item of todosItens) {
+    await firebase.database().ref('rotinas_config/julia').push(item);
+  }
+  linha(`✓ ${todosItens.length} itens da rotina da Júlia inseridos!`, 'ok');
+  linha('Pode fechar esta aba.', 'ok');
+}
+
+const LUANA_ROTINA = [
+  { desc: 'Ativar leads — abrir leads, fechar com campanha', periodo: 'Dia todo', ordem: 1 },
+  { desc: 'Tratar alunos bloqueados', periodo: 'Dia todo', ordem: 2 },
+  { desc: 'Wellhub / grupos / atendimentos gerais', periodo: 'Dia todo', ordem: 3 },
+  { desc: 'Verificar FitzAp e responder todos os atendimentos pendentes (vendas, suporte, solicitações)', periodo: 'Dia todo', ordem: 4 },
+  { desc: 'Manter FitzAp acompanhado durante todo o dia, respondendo novos atendimentos conforme chegam', periodo: 'Dia todo', ordem: 5 },
+  { desc: 'Trabalhar carteira de clientes — indicações, contatos e campanhas para geração de leads', periodo: 'Dia todo', ordem: 6 },
+  { desc: 'Atendimento presencial na recepção', periodo: 'A partir das 16h', ordem: 7 },
+  { desc: 'Lançar vendas do dia anterior no sistema de games', periodo: 'Dia todo', ordem: 8 },
+];
+
+async function seedLuana() {
+  linha('Criando rotina da Luana...', 'info');
+  await firebase.database().ref('rotinas_config/luana').remove();
+  for (const item of LUANA_ROTINA) {
+    await firebase.database().ref('rotinas_config/luana').push(item);
+  }
+  linha(`✓ ${LUANA_ROTINA.length} itens da rotina da Luana inseridos!`, 'ok');
+  linha('Pode fechar esta aba.', 'ok');
+}
+
+const COBERTURA_EMILLY = [
+  { desc: 'Verificar o grupo do Wellhub para validar tokens', periodo: '08h–11h', ordem: 101 },
+  { desc: 'Adicionar créditos referentes aos tokens do dia anterior e acompanhar novas solicitações', periodo: '08h–11h', ordem: 102 },
+  { desc: 'Acessar o e-mail, filtrar pedidos de cancelamento, etiquetar e organizar caixa de entrada', periodo: '08h–11h', ordem: 103 },
+  { desc: 'Enviar print dos cancelamentos no grupo interno', periodo: '08h–11h', ordem: 104 },
+  { desc: 'Encaminhar e-mail padrão para cada aluno que solicitou cancelamento', periodo: '08h–11h', ordem: 105 },
+  { desc: 'Abrir atendimento individual para cada cancelamento, tratar e buscar reversão', periodo: '08h–11h', ordem: 106 },
+  { desc: 'Após concluir cancelamento, alterar etiqueta do aluno de Lead para Ex-aluno', periodo: '08h–11h', ordem: 107 },
+  { desc: 'Realizar renovações e efetuar transações dos planos', periodo: '08h–11h', ordem: 108 },
+  { desc: 'Conferir contratos com vencimento do dia e renovar', periodo: '08h–11h', ordem: 109 },
+  { desc: 'Verificar contratos com vencimento de até 3 dias — oferecer antecipação ou upgrade de plano', periodo: '08h–11h', ordem: 110 },
+  { desc: 'Planejamento do dia', periodo: '08h–11h', ordem: 111 },
+  { desc: 'Divulgar campanha diária nos grupos de WhatsApp', periodo: '08h–11h', ordem: 112 },
+  { desc: 'Disparar campanha em massa no FitzAp', periodo: '08h–11h', ordem: 113 },
+  { desc: 'Verificar FitzAp e responder todos os atendimentos pendentes (vendas, suporte, solicitações)', periodo: 'Dia todo', ordem: 114 },
+  { desc: 'Manter FitzAp acompanhado durante todo o dia, respondendo novos atendimentos conforme chegam', periodo: 'Dia todo', ordem: 115 },
+  { desc: 'Trabalhar carteira de clientes — indicações, contatos e campanhas para geração de leads', periodo: 'Dia todo', ordem: 116 },
+  { desc: 'Foco total em vendas', periodo: 'A partir das 11h', ordem: 117 },
+].map(item => ({ ...item, grupo: 'Cobertura Emilly', expira: '2026-07-28' }));
+
+async function seedCobertura() {
+  if (!confirm('Adiciona 17 itens de cobertura da Emilly na rotina da Júlia, Luana e Gustavo (com expiração em 28/07)?\n\nNÃO apaga as rotinas existentes — só adiciona o grupo.')) return;
+  for (const userId of ['julia', 'luana', 'gustavo']) {
+    linha(`Adicionando cobertura para ${userId}...`, 'info');
+    // Remove cobertura antiga se existir
+    const snap = await firebase.database().ref(`rotinas_config/${userId}`).get();
+    const atual = snap.val() || {};
+    for (const [id, item] of Object.entries(atual)) {
+      if (item.grupo === 'Cobertura Emilly') {
+        await firebase.database().ref(`rotinas_config/${userId}/${id}`).remove();
+      }
+    }
+    for (const item of COBERTURA_EMILLY) {
+      await firebase.database().ref(`rotinas_config/${userId}`).push(item);
+    }
+    linha(`✓ ${COBERTURA_EMILLY.length} itens de cobertura adicionados para ${userId}`, 'ok');
+  }
+  linha('Cobertura Emilly configurada! Expira em 28/07/2026.', 'ok');
+}
+
+const PLANTAO_SEED = [
+  { desc: 'Verificar grupo Wellhub e validar tokens', periodo: '08h–11h', ordem: 1 },
+  { desc: 'Adicionar créditos Wellhub/Totalpass do dia anterior', periodo: '08h–11h', ordem: 2 },
+  { desc: 'Acessar e-mail, filtrar cancelamentos e organizar caixa de entrada', periodo: '08h–11h', ordem: 3 },
+  { desc: 'Enviar print dos cancelamentos no grupo interno', periodo: '08h–11h', ordem: 4 },
+  { desc: 'Encaminhar e-mail padrão para cada aluno que solicitou cancelamento', periodo: '08h–11h', ordem: 5 },
+  { desc: 'Abrir atendimento individual para cancelamentos e buscar reversão', periodo: '08h–11h', ordem: 6 },
+  { desc: 'Após cancelamento, alterar etiqueta de Lead para Ex-aluno', periodo: '08h–11h', ordem: 7 },
+  { desc: 'Realizar renovações e efetuar transações dos planos', periodo: '08h–11h', ordem: 8 },
+  { desc: 'Conferir contratos com vencimento do dia e renovar', periodo: '08h–11h', ordem: 9 },
+  { desc: 'Verificar contratos com vencimento em até 3 dias', periodo: '08h–11h', ordem: 10 },
+  { desc: 'Planejamento do dia', periodo: '08h–11h', ordem: 11 },
+  { desc: 'Divulgar campanha diária nos grupos de WhatsApp', periodo: '08h–11h', ordem: 12 },
+  { desc: 'Disparar campanha em massa no FitzAp', periodo: '08h–11h', ordem: 13 },
+  { desc: 'Verificar FitzAp e responder todos os atendimentos pendentes', periodo: 'Dia todo', ordem: 14 },
+  { desc: 'Manter FitzAp acompanhado durante todo o dia', periodo: 'Dia todo', ordem: 15 },
+  { desc: 'Trabalhar carteira de clientes — indicações e campanhas para geração de leads', periodo: 'Dia todo', ordem: 16 },
+  { desc: 'Ativar leads — abrir e fechar com campanha', periodo: 'Dia todo', ordem: 17 },
+  { desc: 'Tratar alunos bloqueados', periodo: 'Dia todo', ordem: 18 },
+  { desc: 'Verificar fila das aulas e abrir novas aulas', periodo: '11h', ordem: 19 },
+  { desc: 'Verificar atendimentos e grupos — pendências de professores', periodo: '11h30', ordem: 20 },
+  { desc: 'Ajustar agenda e divulgar as aulas', periodo: '12h', ordem: 21 },
+  { desc: 'Organização do café e recepção (varrer e limpar)', periodo: '16h', ordem: 22 },
+  { desc: 'Divulgar aula do período da manhã', periodo: '18h', ordem: 23 },
+  { desc: 'Divulgar link de avaliação nos grupos', periodo: '19h', ordem: 24 },
+  { desc: 'Atendimento presencial na recepção', periodo: 'A partir das 16h', ordem: 25 },
+  { desc: 'Lançar vendas do dia anterior no sistema de games', periodo: 'Dia todo', ordem: 26 },
+];
+
+async function seedPlantao() {
+  if (!confirm('Recriar lista de Plantão (26 itens consolidados das 3 meninas)?\n\nApaga a lista atual e recria do zero.')) return;
+  linha('Recriando Plantão...', 'info');
+  await firebase.database().ref('plantao_config').remove();
+  for (const item of PLANTAO_SEED) {
+    await firebase.database().ref('plantao_config').push(item);
+  }
+  linha(`✓ ${PLANTAO_SEED.length} itens de plantão inseridos!`, 'ok');
+  linha('Pode fechar esta aba.', 'ok');
+}
+
 </script>
+<div style="display:flex;gap:12px;margin-top:2rem;flex-wrap:wrap">
+  <button onclick="seed()" style="padding:10px 20px;background:#444;color:#f0f0f0;border:none;border-radius:6px;font-size:15px;cursor:pointer;font-weight:bold">⚠ Recriar 48 tarefas (apaga tudo)</button>
+  <button onclick="seedJulia()" style="padding:10px 20px;background:#c9a84c;color:#000;border:none;border-radius:6px;font-size:15px;cursor:pointer;font-weight:bold">▶ Forçar rotina da Júlia</button>
+  <button onclick="seedLuana()" style="padding:10px 20px;background:#5a9e5a;color:#000;border:none;border-radius:6px;font-size:15px;cursor:pointer;font-weight:bold">▶ Forçar rotina da Luana</button>
+  <button onclick="seedCobertura()" style="padding:10px 20px;background:#7777cc;color:#fff;border:none;border-radius:6px;font-size:15px;cursor:pointer;font-weight:bold">🔄 Ativar Cobertura Emilly</button>
+  <button onclick="seedPlantao()" style="padding:10px 20px;background:#5a9e9e;color:#000;border:none;border-radius:6px;font-size:15px;cursor:pointer;font-weight:bold">🔄 Recriar lista de Plantão</button>
+</div>
 </body>
 </html>

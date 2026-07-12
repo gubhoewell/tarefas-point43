@@ -613,38 +613,6 @@ const REF = DB.ref('tarefas');
 const REF_ROTINA = DB.ref('rotina');
 const REF_CONFIG = DB.ref('rotinas_config');
 const REF_PONTO = DB.ref('ponto');
-const REF_PLANTAO_CONFIG = DB.ref('plantao_config');
-const REF_PLANTAO = DB.ref('plantao');
-
-// Seed do Plantão — consolidação de todas as meninas sem duplicatas
-const PLANTAO_SEED = [
-  { desc: 'Verificar grupo Wellhub e validar tokens', periodo: '08h–11h', ordem: 1 },
-  { desc: 'Adicionar créditos Wellhub/Totalpass do dia anterior', periodo: '08h–11h', ordem: 2 },
-  { desc: 'Acessar e-mail, filtrar cancelamentos e organizar caixa de entrada', periodo: '08h–11h', ordem: 3 },
-  { desc: 'Enviar print dos cancelamentos no grupo interno', periodo: '08h–11h', ordem: 4 },
-  { desc: 'Encaminhar e-mail padrão para cada aluno que solicitou cancelamento', periodo: '08h–11h', ordem: 5 },
-  { desc: 'Abrir atendimento individual para cancelamentos e buscar reversão', periodo: '08h–11h', ordem: 6 },
-  { desc: 'Após cancelamento, alterar etiqueta de Lead para Ex-aluno', periodo: '08h–11h', ordem: 7 },
-  { desc: 'Realizar renovações e efetuar transações dos planos', periodo: '08h–11h', ordem: 8 },
-  { desc: 'Conferir contratos com vencimento do dia e renovar', periodo: '08h–11h', ordem: 9 },
-  { desc: 'Verificar contratos com vencimento em até 3 dias', periodo: '08h–11h', ordem: 10 },
-  { desc: 'Planejamento do dia', periodo: '08h–11h', ordem: 11 },
-  { desc: 'Divulgar campanha diária nos grupos de WhatsApp', periodo: '08h–11h', ordem: 12 },
-  { desc: 'Disparar campanha em massa no FitzAp', periodo: '08h–11h', ordem: 13 },
-  { desc: 'Verificar FitzAp e responder todos os atendimentos pendentes', periodo: 'Dia todo', ordem: 14 },
-  { desc: 'Manter FitzAp acompanhado durante todo o dia', periodo: 'Dia todo', ordem: 15 },
-  { desc: 'Trabalhar carteira de clientes — indicações e campanhas para geração de leads', periodo: 'Dia todo', ordem: 16 },
-  { desc: 'Ativar leads — abrir e fechar com campanha', periodo: 'Dia todo', ordem: 17 },
-  { desc: 'Tratar alunos bloqueados', periodo: 'Dia todo', ordem: 18 },
-  { desc: 'Verificar fila das aulas e abrir novas aulas', periodo: '11h', ordem: 19 },
-  { desc: 'Verificar atendimentos e grupos — pendências de professores', periodo: '11h30', ordem: 20 },
-  { desc: 'Ajustar agenda e divulgar as aulas', periodo: '12h', ordem: 21 },
-  { desc: 'Organização do café e recepção (varrer e limpar)', periodo: '16h', ordem: 22 },
-  { desc: 'Divulgar aula do período da manhã', periodo: '18h', ordem: 23 },
-  { desc: 'Divulgar link de avaliação nos grupos', periodo: '19h', ordem: 24 },
-  { desc: 'Atendimento presencial na recepção', periodo: 'A partir das 16h', ordem: 25 },
-  { desc: 'Lançar vendas do dia anterior no sistema de games', periodo: 'Dia todo', ordem: 26 },
-];
 
 // Seed inicial da Emilly — só usado se o banco estiver vazio
 const ROTINAS_SEED = {
@@ -779,7 +747,6 @@ function renderTabs() {
   const tabs = [
     { id: 'minhas', label: `Minhas tarefas${badge}` },
     ...(temRotina || u.gestor ? [{ id: 'rotina', label: 'Rotina diária' }] : []),
-    { id: 'plantao', label: '🔄 Plantão' },
     { id: 'geral', label: 'Visão geral' },
     { id: 'ponto', label: 'Ponto' },
   ];
@@ -844,24 +811,12 @@ function escutarTarefas() {
     pontoHistorico = snap.val() || {};
     if (tabAtiva === 'ponto') renderConteudo();
   });
-  REF_PLANTAO_CONFIG.on('value', snap => {
-    plantaoConfig = snap.val() || {};
-    if (!Object.keys(plantaoConfig).length) {
-      PLANTAO_SEED.forEach(item => REF_PLANTAO_CONFIG.push(item));
-    }
-    if (tabAtiva === 'plantao') renderConteudo();
-  });
-  REF_PLANTAO.child(hoje()).on('value', snap => {
-    plantaoHoje = snap.val() || {};
-    if (tabAtiva === 'plantao') renderConteudo();
-  });
 }
 
 // ── RENDERIZAÇÃO ──
 function renderConteudo() {
   if (tabAtiva === 'minhas') renderMinhas();
   else if (tabAtiva === 'rotina') renderRotina();
-  else if (tabAtiva === 'plantao') renderPlantao();
   else if (tabAtiva === 'ponto') renderPonto();
   else renderGeral();
 }
@@ -967,12 +922,6 @@ function itensOrdenados(userId) {
   return Object.entries(cfg)
     .map(([id, v]) => ({ id, ...v }))
     .filter(item => !item.expira || item.expira >= hj)
-    .sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
-}
-
-function plantaoOrdenado() {
-  return Object.entries(plantaoConfig)
-    .map(([id, v]) => ({ id, ...v }))
     .sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
 }
 
@@ -1115,52 +1064,243 @@ function renderRotina() {
   document.getElementById('conteudo').innerHTML = html;
 }
 
-function renderPlantao() {
-  const isCeo = usuarioAtual === 'gustavo';
-  const itens = plantaoOrdenado();
-  const feitos = itens.filter(i => plantaoHoje[i.id]).length;
-  const pct = itens.length ? Math.round((feitos / itens.length) * 100) : 0;
+let dragSrcId = null;
+let dragSrcUser = null;
+let dragSrcGrupo = null;
 
-  const [ano, mes, dia] = hoje().split('-');
-  let html = `
-    <div style="margin-bottom:1.25rem">
-      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
-        <div>
-          <div style="font-size:13px;color:#555;margin-bottom:2px">PLANTÃO DO DIA — ${dia}/${mes}/${ano}</div>
-          <div style="font-size:14px;color:#888">${feitos} de ${itens.length} itens concluídos</div>
-        </div>
-        <div style="display:flex;align-items:center;gap:10px">
-          <div class="rotina-barra-wrap" style="width:120px"><div class="rotina-barra" style="width:${pct}%"></div></div>
-          <span style="font-size:14px;color:#888">${pct}%</span>
-          ${isCeo ? `<button class="btn-nova" style="margin:0;padding:8px 16px;font-size:14px" onclick="abrirModalPlantao(null)">+ Item</button>` : ''}
-        </div>
-      </div>
-      ${isCeo ? `<div style="font-size:12px;color:#444;margin-top:8px">CEO: clique em ✎ para editar, × para remover. As alterações valem para todos os dias.</div>` : ''}
-    </div>
-    <div class="lista-plantao">`;
+function dragStart(e) {
+  dragSrcId = e.currentTarget.dataset.itemid;
+  dragSrcUser = e.currentTarget.dataset.userid;
+  dragSrcGrupo = e.currentTarget.dataset.grupo || '';
+  e.currentTarget.style.opacity = '0.4';
+  e.dataTransfer.effectAllowed = 'move';
+  e.stopPropagation();
+}
 
-  if (itens.length === 0) {
-    html += '<div class="vazio">Nenhum item de plantão cadastrado.</div>';
+function dragEnd(e) {
+  e.currentTarget.style.opacity = '';
+  document.querySelectorAll('.drag-over-item,.drag-over-grupo').forEach(el => {
+    el.classList.remove('drag-over-item', 'drag-over-grupo');
+  });
+}
+
+// ── Drag de ITENS individuais (dentro ou fora de grupo) ──
+function dragOverItem(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  const target = e.currentTarget;
+  if (target.dataset.itemid === dragSrcId) return;
+  if (target.dataset.grupo !== dragSrcGrupo) return;
+  document.querySelectorAll('.drag-over-item').forEach(el => el.classList.remove('drag-over-item'));
+  target.classList.add('drag-over-item');
+}
+
+function dragDropItem(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  const targetId = e.currentTarget.dataset.itemid;
+  const targetUser = e.currentTarget.dataset.userid;
+  const targetGrupo = e.currentTarget.dataset.grupo || '';
+  if (dragSrcId === targetId || dragSrcUser !== targetUser || targetGrupo !== dragSrcGrupo) return;
+
+  const itens = itensOrdenados(targetUser);
+
+  if (!dragSrcGrupo) {
+    // fora de grupo — reordena por `ordem` global
+    const slots = buildSlots(itens);
+    const srcSlotIdx = slots.findIndex(s => s.type === 'item' && s.item.id === dragSrcId);
+    const tgtSlotIdx = slots.findIndex(s => s.type === 'item' && s.item.id === targetId);
+    if (srcSlotIdx === -1 || tgtSlotIdx === -1) return;
+    slots.splice(tgtSlotIdx, 0, slots.splice(srcSlotIdx, 1)[0]);
+    salvarOrdemSlots(slots, targetUser);
   } else {
-    for (const item of itens) {
-      const feito = !!plantaoHoje[item.id];
-      html += `
-        <div class="rotina-item ${feito ? 'feito' : ''}" onclick="togglePlantao('${item.id}',${feito})">
-          <div class="rotina-check" style="cursor:pointer"></div>
-          <div style="flex:1;cursor:pointer">
-            <div class="rotina-desc">${item.desc}</div>
-            <div class="rotina-periodo">${item.periodo || ''}</div>
-          </div>
-          ${isCeo ? `
-            <button class="btn-editar" onclick="event.stopPropagation();abrirModalPlantao('${item.id}')" title="Editar">✎</button>
-            <button class="btn-excluir" onclick="event.stopPropagation();removerItemPlantao('${item.id}')">×</button>
-          ` : ''}
-        </div>`;
+    // dentro de grupo — reordena por `ordemInterna`
+    const grupoItens = itens.filter(i => i.grupo === dragSrcGrupo)
+      .sort((a, b) => (a.ordemInterna || a.ordem || 0) - (b.ordemInterna || b.ordem || 0));
+    const srcIdx = grupoItens.findIndex(i => i.id === dragSrcId);
+    const tgtIdx = grupoItens.findIndex(i => i.id === targetId);
+    grupoItens.splice(tgtIdx, 0, grupoItens.splice(srcIdx, 1)[0]);
+    const updates = {};
+    grupoItens.forEach((item, i) => {
+      updates[`rotinas_config/${targetUser}/${item.id}/ordemInterna`] = i + 1;
+    });
+    DB.ref().update(updates);
+  }
+}
+
+// ── Drag de GRUPOS inteiros ──
+function dragStartGrupo(e) {
+  dragSrcGrupo = e.currentTarget.dataset.grupo;
+  dragSrcUser = e.currentTarget.dataset.userid;
+  dragSrcId = null;
+  e.currentTarget.style.opacity = '0.4';
+  e.dataTransfer.effectAllowed = 'move';
+}
+
+function dragOverGrupo(e) {
+  e.preventDefault();
+  const target = e.currentTarget;
+  if (target.dataset.grupo === dragSrcGrupo) return;
+  document.querySelectorAll('.drag-over-grupo').forEach(el => el.classList.remove('drag-over-grupo'));
+  target.classList.add('drag-over-grupo');
+}
+
+function dragDropGrupo(e) {
+  e.preventDefault();
+  const targetGrupo = e.currentTarget.dataset.grupo;
+  const targetUser = e.currentTarget.dataset.userid;
+  if (dragSrcGrupo === targetGrupo || dragSrcUser !== targetUser) return;
+
+  const itens = itensOrdenados(targetUser);
+  const slots = buildSlots(itens);
+  const srcIdx = slots.findIndex(s => s.type === 'grupo' && s.nome === dragSrcGrupo);
+  const tgtIdx = slots.findIndex(s => s.type === 'grupo' && s.nome === targetGrupo);
+  if (srcIdx === -1 || tgtIdx === -1) return;
+  slots.splice(tgtIdx, 0, slots.splice(srcIdx, 1)[0]);
+  salvarOrdemSlots(slots, targetUser);
+}
+
+function salvarOrdemSlots(slots, userId) {
+  const updates = {};
+  slots.forEach((slot, i) => {
+    if (slot.type === 'item') {
+      updates[`rotinas_config/${userId}/${slot.item.id}/ordem`] = i + 1;
+    } else {
+      slot.itens.forEach(item => {
+        updates[`rotinas_config/${userId}/${item.id}/ordem`] = i + 1;
+      });
     }
+  });
+  DB.ref().update(updates);
+}
+
+// ── PONTO ──
+function horaAgora() {
+  return new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+
+function calcularTempo(registros) {
+  const lista = Object.values(registros).sort((a, b) => a.timestamp - b.timestamp);
+  let total = 0, entrada = null;
+  for (const r of lista) {
+    if (r.tipo === 'entrada') entrada = r.timestamp;
+    else if (r.tipo === 'saida' && entrada) { total += r.timestamp - entrada; entrada = null; }
+  }
+  if (entrada) total += Date.now() - entrada;
+  return msParaHora(total);
+}
+
+function batePonto(tipo) {
+  REF_PONTO.child(hoje()).child(usuarioAtual).push({
+    tipo, hora: horaAgora(), timestamp: Date.now()
+  });
+}
+
+function renderPonto() {
+  const u = usuario(usuarioAtual);
+  const isCeo = usuarioAtual === 'gustavo';
+  const isGestor = u.gestor;
+  const c = document.getElementById('conteudo');
+
+  if (isGestor) {
+    // ── Visão gestores: histórico do time operacional ──
+    const visíveis = isCeo
+      ? USUARIOS.filter(u => !u.gestor)
+      : USUARIOS.filter(u => !u.gestor); // Bene e Mateus veem o mesmo time
+    const datas = Object.keys(pontoHistorico).sort().reverse().slice(0, 14);
+    let html = '<div class="ponto-ceo">';
+    for (const data of datas) {
+      const [ano, mes, dia] = data.split('-');
+      html += `<div class="ponto-data-header">${dia}/${mes}/${ano}</div>`;
+      for (const u of visíveis) {
+        const regs = pontoHistorico[data]?.[u.id];
+        if (!regs) continue;
+        const lista = Object.values(regs).sort((a, b) => a.timestamp - b.timestamp);
+        const tempo = calcularTempo(regs);
+        html += `<div class="ponto-linha">
+          <div class="pessoa-avatar-sm" style="width:28px;height:28px;font-size:11px">${iniciais(u.nome)}</div>
+          <span class="ponto-nome">${u.nome}</span>
+          <span class="ponto-registros">${lista.map(r => `<span class="ponto-tag ${r.tipo}">${r.tipo === 'entrada' ? '↓' : '↑'} ${r.hora}</span>`).join('')}</span>
+          <span class="ponto-total">${tempo}</span>
+        </div>`;
+      }
+    }
+    html += '</div>';
+    c.innerHTML = html;
+    return;
   }
 
-  html += '</div>';
-  document.getElementById('conteudo').innerHTML = html;
+  // ── Visão individual ──
+  const meusRegs = (pontoHoje[usuarioAtual] ? Object.values(pontoHoje[usuarioAtual]) : [])
+    .sort((a, b) => a.timestamp - b.timestamp);
+  const ultimo = meusRegs[meusRegs.length - 1];
+  const dentroJornada = ultimo?.tipo === 'entrada';
+  const tempo = pontoHoje[usuarioAtual] ? calcularTempo(pontoHoje[usuarioAtual]) : '0h00';
+
+  // histórico pessoal — últimos 30 dias
+  const mesAtual = hoje().slice(0, 7);
+  const datasDoMes = Object.keys(pontoHistorico)
+    .filter(d => d.slice(0, 7) === mesAtual && d !== hoje())
+    .sort().reverse();
+
+  let totalMesMs = 0;
+  let historicoHTML = '';
+  for (const data of datasDoMes) {
+    const regs = pontoHistorico[data]?.[usuarioAtual];
+    if (!regs) continue;
+    const lista = Object.values(regs).sort((a, b) => a.timestamp - b.timestamp);
+    const ms = calcularTempoMs(regs);
+    totalMesMs += ms;
+    const [ano, mes, dia] = data.split('-');
+    historicoHTML += `
+      <div class="ponto-hist-linha">
+        <span class="ponto-hist-data">${dia}/${mes}</span>
+        <span class="ponto-hist-regs">${lista.map(r => `<span class="ponto-tag ${r.tipo}">${r.tipo === 'entrada' ? '↓' : '↑'} ${r.hora}</span>`).join('')}</span>
+        <span class="ponto-hist-total">${msParaHora(ms)}</span>
+      </div>`;
+  }
+
+  const totalMes = msParaHora(totalMesMs);
+
+  c.innerHTML = `
+    <div class="ponto-individual">
+      <div class="ponto-relogio">${horaAgora()}</div>
+      <div class="ponto-tempo-total">${tempo} hoje</div>
+      <div class="ponto-btns">
+        <button class="btn-ponto entrada ${dentroJornada ? 'inativo' : ''}" onclick="batePonto('entrada')" ${dentroJornada ? 'disabled' : ''}>↓ Entrada</button>
+        <button class="btn-ponto saida ${!dentroJornada ? 'inativo' : ''}" onclick="batePonto('saida')" ${!dentroJornada ? 'disabled' : ''}>↑ Saída</button>
+      </div>
+      <div class="ponto-historico-hoje">
+        ${meusRegs.length === 0 ? '<div class="vazio" style="margin-top:1rem">Nenhum registro hoje</div>' :
+          meusRegs.map(r => `<div class="ponto-reg"><span class="ponto-tag ${r.tipo}">${r.tipo === 'entrada' ? '↓ Entrada' : '↑ Saída'}</span> ${r.hora}</div>`).join('')}
+      </div>
+      ${historicoHTML ? `
+        <div class="ponto-relatorio">
+          <div class="ponto-relatorio-header">
+            <span>Histórico do mês</span>
+            <span class="ponto-total">Total: ${totalMes}</span>
+          </div>
+          ${historicoHTML}
+        </div>` : ''}
+    </div>`;
+
+  setTimeout(() => { if (tabAtiva === 'ponto') renderPonto(); }, 60000 - (Date.now() % 60000));
+}
+
+function calcularTempoMs(registros) {
+  const lista = Object.values(registros).sort((a, b) => a.timestamp - b.timestamp);
+  let total = 0, entrada = null;
+  for (const r of lista) {
+    if (r.tipo === 'entrada') entrada = r.timestamp;
+    else if (r.tipo === 'saida' && entrada) { total += r.timestamp - entrada; entrada = null; }
+  }
+  return total;
+}
+
+function msParaHora(ms) {
+  const h = Math.floor(ms / 3600000);
+  const m = Math.floor((ms % 3600000) / 60000);
+  return `${h}h${m.toString().padStart(2,'0')}`;
 }
 
 function togglePlantao(itemId, atual) {
@@ -1459,13 +1599,13 @@ function abrirModalRotina(userId, itemId) {
     descEl.value = item.desc || '';
     perEl.value = item.periodo || '';
     document.getElementById('r-grupo').value = item.grupo || '';
-    document.getElementById('r-expira').value = item.expira || '';
     campoUser.style.display = 'none';
   } else {
     titulo.textContent = 'Novo Item de Rotina';
     descEl.value = '';
     perEl.value = '';
     document.getElementById('r-grupo').value = '';
+    // mostrar seletor de usuário se não especificado
     if (!userId) {
       campoUser.style.display = 'block';
       selUser.innerHTML = USUARIOS
@@ -1491,10 +1631,10 @@ function salvarItemRotina() {
   const desc = document.getElementById('r-descricao').value.trim();
   const periodo = document.getElementById('r-periodo').value.trim();
   const grupo = document.getElementById('r-grupo').value.trim();
-  const expira = document.getElementById('r-expira').value.trim();
   if (!desc) { alert('Descreva o item.'); return; }
 
   const userId = editandoRotinaUser || document.getElementById('r-usuario').value;
+  const dados = { desc, periodo, ...(grupo ? { grupo } : { grupo: null }) };
 
   // plantão usa REF_PLANTAO_CONFIG
   if (userId === 'plantao') {

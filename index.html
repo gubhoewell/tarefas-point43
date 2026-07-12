@@ -1433,10 +1433,6 @@ function removerItemPlantao(itemId) {
   }
 }
 
-let dragSrcId = null;
-let dragSrcUser = null;
-let dragSrcGrupo = null;
-
 function dragStart(e) {
   dragSrcId = e.currentTarget.dataset.itemid;
   dragSrcUser = e.currentTarget.dataset.userid;
@@ -1729,12 +1725,11 @@ function salvarItemRotina() {
   const desc = document.getElementById('r-descricao').value.trim();
   const periodo = document.getElementById('r-periodo').value.trim();
   const grupo = document.getElementById('r-grupo').value.trim();
+  const expira = document.getElementById('r-expira').value.trim();
   if (!desc) { alert('Descreva o item.'); return; }
 
   const userId = editandoRotinaUser || document.getElementById('r-usuario').value;
-  const dados = { desc, periodo, ...(grupo ? { grupo } : { grupo: null }) };
 
-  // plantão usa REF_PLANTAO_CONFIG
   if (userId === 'plantao') {
     const dados = { desc, periodo, ...(expira ? { expira } : {}) };
     if (editandoRotinaId) {

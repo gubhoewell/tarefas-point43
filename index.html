@@ -1401,10 +1401,56 @@ function msParaHora(ms) {
   return `${h}h${m.toString().padStart(2,'0')}`;
 }
 
+// ── SIMILARIDADE DE TEXTO ──
+const STOP_W = new Set(['e','o','a','os','as','de','da','do','dos','das','para','com','em','no','na','nos','nas','um','uma','que','por','ao','aos','se']);
+
+function normTxt(txt) {
+  return (txt || '').toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9\s]/g, '').trim();
+}
+
+function palavrasChave(txt) {
+  return normTxt(txt).split(/\s+/).filter(w => w.length > 2 && !STOP_W.has(w));
+}
+
+function textosSimilares(a, b) {
+  const pa = palavrasChave(a);
+  const pb = palavrasChave(b);
+  if (!pa.length || !pb.length) return false;
+  const menor = pa.length <= pb.length ? pa : pb;
+  const maiorSet = new Set(pa.length <= pb.length ? pb : pa);
+  const matches = menor.filter(w => maiorSet.has(w)).length;
+  return matches / menor.length >= 0.7;
+}
+
+function sincronizarPlantaoParaRotina(plantaoItemId, marcar) {
+  const descPlantao = plantaoConfig[plantaoItemId]?.desc;
+  if (!descPlantao) return;
+  for (const item of itensOrdenados(usuarioAtual)) {
+    if (textosSimilares(item.desc, descPlantao)) {
+      const p = `${hoje()}/${usuarioAtual}/${item.id}`;
+      if (marcar) REF_ROTINA.child(p).set(true);
+      else REF_ROTINA.child(p).remove();
+    }
+  }
+}
+
+function sincronizarRotinaParaPlantao(itemDesc, marcar) {
+  for (const item of plantaoOrdenado()) {
+    if (textosSimilares(item.desc, itemDesc)) {
+      const p = `${hoje()}/${item.id}`;
+      if (marcar) REF_PLANTAO.child(p).set(true);
+      else REF_PLANTAO.child(p).remove();
+    }
+  }
+}
+
 function togglePlantao(itemId, atual) {
   const path = `${hoje()}/${itemId}`;
   if (atual) REF_PLANTAO.child(path).remove();
   else REF_PLANTAO.child(path).set(true);
+  sincronizarPlantaoParaRotina(itemId, !atual);
 }
 
 function abrirModalPlantao(itemId) {
@@ -1672,6 +1718,10 @@ function toggleRotina(userId, itemId, atual) {
   const path = `${hoje()}/${userId}/${itemId}`;
   if (atual) REF_ROTINA.child(path).remove();
   else REF_ROTINA.child(path).set(true);
+  if (userId === usuarioAtual) {
+    const item = rotinasConfig[userId]?.[itemId];
+    if (item?.desc) sincronizarRotinaParaPlantao(item.desc, !atual);
+  }
 }
 
 // ── CRUD ROTINA ──

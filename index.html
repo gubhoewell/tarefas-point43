@@ -976,6 +976,47 @@ function plantaoOrdenado() {
     .sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
 }
 
+function renderItemPlantao(item, statusHoje, isCeo, dentroGrupo = false) {
+  const feito = !!statusHoje[item.id];
+  return `
+    <div class="rotina-item ${feito ? 'feito' : ''} ${dentroGrupo ? 'dentro-grupo' : ''}"
+         onclick="togglePlantao('${item.id}',${feito})">
+      <div class="rotina-check" style="cursor:pointer"></div>
+      <div style="flex:1;cursor:pointer">
+        <div class="rotina-desc">${item.desc}</div>
+        <div class="rotina-periodo">${item.periodo || ''}</div>
+      </div>
+      ${isCeo ? `
+        <button class="btn-editar" onclick="event.stopPropagation();abrirModalPlantao('${item.id}')" title="Editar">✎</button>
+        <button class="btn-excluir" onclick="event.stopPropagation();removerItemPlantao('${item.id}')">×</button>
+      ` : ''}
+    </div>`;
+}
+
+function renderGruposPlantao(itens, statusHoje, isCeo) {
+  const slots = buildSlots(itens);
+  let html = '';
+  for (const slot of slots) {
+    if (slot.type === 'item') {
+      html += renderItemPlantao(slot.item, statusHoje, isCeo);
+    } else {
+      const feitosGrupo = slot.itens.filter(i => statusHoje[i.id]).length;
+      const completo = feitosGrupo === slot.itens.length;
+      html += `
+        <details class="rotina-grupo" ${completo ? '' : 'open'}>
+          <summary class="rotina-grupo-header">
+            <span class="rotina-grupo-nome">${slot.nome}</span>
+            <span class="rotina-grupo-pct ${completo ? 'completo' : ''}">${feitosGrupo}/${slot.itens.length}${completo ? ' ✓' : ''}</span>
+          </summary>
+          <div>
+            ${slot.itens.map(i => renderItemPlantao(i, statusHoje, isCeo, true)).join('')}
+          </div>
+        </details>`;
+    }
+  }
+  return html;
+}
+
 function renderPlantao() {
   const isCeo = usuarioAtual === 'gustavo';
   const itens = plantaoOrdenado();
@@ -995,31 +1036,14 @@ function renderPlantao() {
           ${isCeo ? `<button class="btn-nova" style="margin:0;padding:8px 16px;font-size:14px" onclick="abrirModalPlantao(null)">+ Item</button>` : ''}
         </div>
       </div>
-      ${isCeo ? `<div style="font-size:12px;color:#444;margin-top:8px">CEO: clique ✎ para editar, × para remover. Alterações valem para todos os dias.</div>` : ''}
+      ${isCeo ? `<div style="font-size:12px;color:#444;margin-top:8px">CEO: clique ✎ para editar, × para remover.</div>` : ''}
     </div>
-    <div>`;
+    <div>
+      ${itens.length === 0
+        ? '<div class="vazio">Nenhum item de plantão cadastrado.</div>'
+        : renderGruposPlantao(itens, plantaoHoje, isCeo)}
+    </div>`;
 
-  if (itens.length === 0) {
-    html += '<div class="vazio">Nenhum item de plantão cadastrado.</div>';
-  } else {
-    for (const item of itens) {
-      const feito = !!plantaoHoje[item.id];
-      html += `
-        <div class="rotina-item ${feito ? 'feito' : ''}" onclick="togglePlantao('${item.id}',${feito})">
-          <div class="rotina-check" style="cursor:pointer"></div>
-          <div style="flex:1;cursor:pointer">
-            <div class="rotina-desc">${item.desc}</div>
-            <div class="rotina-periodo">${item.periodo || ''}</div>
-          </div>
-          ${isCeo ? `
-            <button class="btn-editar" onclick="event.stopPropagation();abrirModalPlantao('${item.id}')" title="Editar">✎</button>
-            <button class="btn-excluir" onclick="event.stopPropagation();removerItemPlantao('${item.id}')">×</button>
-          ` : ''}
-        </div>`;
-    }
-  }
-
-  html += '</div>';
   document.getElementById('conteudo').innerHTML = html;
 }
 

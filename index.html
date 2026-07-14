@@ -745,6 +745,7 @@ let filtroStatus = 'todas';
 let editandoRotinaId = null;
 let editandoRotinaUser = null;
 let dataRotina = hoje();
+let mostrarTodasRotinas = false;
 
 function hoje() {
   return new Date().toISOString().split('T')[0];
@@ -1000,8 +1001,8 @@ function itensOrdenados(userId) {
   return Object.entries(cfg)
     .map(([id, v]) => ({ id, ...v }))
     .filter(item => !item.expira || item.expira >= hj)
-    .filter(item => item.diaSemana == null || item.diaSemana === diaSemanaHoje)
-    .filter(item => !item.diaDoMes || item.diaDoMes === diaDoMesHoje)
+    .filter(item => mostrarTodasRotinas || item.diaSemana == null || item.diaSemana === diaSemanaHoje)
+    .filter(item => mostrarTodasRotinas || !item.diaDoMes || item.diaDoMes === diaDoMesHoje)
     .filter(item => {
       if (item.frequencia !== 'quinzenal') return true;
       // paridade: semanaRef define se é par ou ímpar (padrão: semanas ímpares)
@@ -1187,6 +1188,10 @@ function renderRotina() {
     let html = `
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:1.25rem;flex-wrap:wrap">
         ${isCeo ? `<button class="btn-nova" onclick="abrirModalRotina(null, null)">+ Adicionar item de rotina</button>` : ''}
+        <button onclick="mostrarTodasRotinas=!mostrarTodasRotinas;renderConteudo()"
+          style="background:${mostrarTodasRotinas?'#2a2200':'none'};border:1px solid ${mostrarTodasRotinas?'#c9a84c':'#333'};color:${mostrarTodasRotinas?'#c9a84c':'#888'};border-radius:6px;padding:6px 12px;cursor:pointer;font-size:13px">
+          ${mostrarTodasRotinas ? '👁 Todas as tarefas' : '👁 Ver fluxo completo'}
+        </button>
         <div style="display:flex;align-items:center;gap:6px;margin-left:auto">
           <button class="btn-trocar" onclick="navegarData(-1)">‹</button>
           <input type="date" value="${dataRotina}" onchange="mudarDataRotina(this.value)"

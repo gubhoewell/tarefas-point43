@@ -560,6 +560,30 @@
       <label>Pessoa</label>
       <select id="r-usuario"></select>
     </div>
+    <div class="campo">
+      <label>Dia da semana <span style="color:#555;font-size:12px">(opcional — deixe em branco para todo dia)</span></label>
+      <select id="r-dia-semana">
+        <option value="">Todo dia</option>
+        <option value="1">Segunda-feira</option>
+        <option value="2">Terça-feira</option>
+        <option value="3">Quarta-feira</option>
+        <option value="4">Quinta-feira</option>
+        <option value="5">Sexta-feira</option>
+        <option value="6">Sábado</option>
+        <option value="0">Domingo</option>
+      </select>
+    </div>
+    <div class="campo">
+      <label>Frequência <span style="color:#555;font-size:12px">(opcional)</span></label>
+      <select id="r-frequencia">
+        <option value="">Semanal (toda semana)</option>
+        <option value="quinzenal">Quinzenal (a cada 2 semanas)</option>
+      </select>
+    </div>
+    <div class="campo">
+      <label>Dia do mês <span style="color:#555;font-size:12px">(opcional — para tarefas mensais)</span></label>
+      <input type="number" id="r-dia-mes" placeholder="Ex: 1, 15, 30" min="1" max="31">
+    </div>
     <div class="campo" id="r-campo-expira">
       <label>Válido até <span style="color:#555;font-size:12px">(opcional — remove o item após essa data)</span></label>
       <input type="date" id="r-expira">
@@ -1799,12 +1823,19 @@ function abrirModalRotina(userId, itemId) {
   const selUser = document.getElementById('r-usuario');
 
   document.getElementById('r-expira').value = '';
+  document.getElementById('r-dia-semana').value = '';
+  document.getElementById('r-frequencia').value = '';
+  document.getElementById('r-dia-mes').value = '';
   if (itemId && userId) {
     titulo.textContent = 'Editar Item de Rotina';
     const item = rotinasConfig[userId]?.[itemId] || {};
     descEl.value = item.desc || '';
     perEl.value = item.periodo || '';
     document.getElementById('r-grupo').value = item.grupo || '';
+    document.getElementById('r-expira').value = item.expira || '';
+    document.getElementById('r-dia-semana').value = item.diaSemana != null ? item.diaSemana : '';
+    document.getElementById('r-frequencia').value = item.frequencia || '';
+    document.getElementById('r-dia-mes').value = item.diaDoMes || '';
     campoUser.style.display = 'none';
   } else {
     titulo.textContent = 'Novo Item de Rotina';
@@ -1854,10 +1885,16 @@ function salvarItemRotina() {
     return;
   }
 
+  const diaSemanaVal = document.getElementById('r-dia-semana').value;
+  const frequenciaVal = document.getElementById('r-frequencia').value;
+  const diaMesVal = document.getElementById('r-dia-mes').value;
   const dados = {
     desc, periodo,
     ...(grupo ? { grupo } : { grupo: null }),
     ...(expira ? { expira } : { expira: null }),
+    ...(diaSemanaVal !== '' ? { diaSemana: parseInt(diaSemanaVal) } : { diaSemana: null }),
+    ...(frequenciaVal ? { frequencia: frequenciaVal, semanaRef: new Date().getDay() % 2 } : { frequencia: null, semanaRef: null }),
+    ...(diaMesVal ? { diaDoMes: parseInt(diaMesVal) } : { diaDoMes: null }),
   };
   if (editandoRotinaId) {
     REF_CONFIG.child(userId).child(editandoRotinaId).update(dados);

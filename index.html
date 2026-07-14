@@ -965,11 +965,24 @@ function renderGeral() {
 function itensOrdenados(userId) {
   const cfg = rotinasConfig[userId] || {};
   const hj = hoje();
-  const diaSemanaHoje = new Date().getDay(); // 0=dom,1=seg,2=ter,3=qua,4=qui,5=sex,6=sab
+  const agora = new Date();
+  const diaSemanaHoje = agora.getDay();
+  const diaDoMesHoje = agora.getDate();
+  // semana do ano (para quinzenal: semanas pares vs ímpares)
+  const inicioAno = new Date(agora.getFullYear(), 0, 1);
+  const semanaAno = Math.ceil(((agora - inicioAno) / 86400000 + inicioAno.getDay() + 1) / 7);
+
   return Object.entries(cfg)
     .map(([id, v]) => ({ id, ...v }))
     .filter(item => !item.expira || item.expira >= hj)
     .filter(item => item.diaSemana == null || item.diaSemana === diaSemanaHoje)
+    .filter(item => !item.diaDoMes || item.diaDoMes === diaDoMesHoje)
+    .filter(item => {
+      if (item.frequencia !== 'quinzenal') return true;
+      // paridade: semanaRef define se é par ou ímpar (padrão: semanas ímpares)
+      const ref = item.semanaRef ?? 1;
+      return semanaAno % 2 === ref % 2;
+    })
     .sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
 }
 

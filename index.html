@@ -712,6 +712,7 @@ let rotinaHoje = {};
 let rotinasConfig = {};
 let plantaoConfig = {};
 let plantaoHoje = {};
+let plantaoDiaSelecionado = hoje(); // data navegável do plantão
 let tabAtiva = 'minhas';
 let pontoHoje = {};
 let pontoHistorico = {};
@@ -851,7 +852,7 @@ function escutarTarefas() {
     }
     if (tabAtiva === 'plantao') renderConteudo();
   });
-  REF_PLANTAO.child(hoje()).on('value', snap => {
+  REF_PLANTAO.child(plantaoDiaSelecionado).on('value', snap => {
     plantaoHoje = snap.val() || {};
     if (tabAtiva === 'plantao') renderConteudo();
   });
@@ -1019,31 +1020,53 @@ function renderGruposPlantao(itens, statusHoje, isCeo) {
   return html;
 }
 
+function navPlantao(delta) {
+  const d = new Date(plantaoDiaSelecionado + 'T12:00:00');
+  d.setDate(d.getDate() + delta);
+  const nova = d.toISOString().slice(0, 10);
+  if (nova > hoje()) return;
+  REF_PLANTAO.child(plantaoDiaSelecionado).off('value');
+  plantaoDiaSelecionado = nova;
+  REF_PLANTAO.child(plantaoDiaSelecionado).on('value', snap => {
+    plantaoHoje = snap.val() || {};
+    if (tabAtiva === 'plantao') renderConteudo();
+  });
+}
+
 function renderPlantao() {
   const isCeo = usuarioAtual === 'gustavo';
+  const ehHoje = plantaoDiaSelecionado === hoje();
   const itens = plantaoOrdenado();
   const feitos = itens.filter(i => plantaoHoje[i.id]).length;
   const pct = itens.length ? Math.round((feitos / itens.length) * 100) : 0;
-  const [ano, mes, dia] = hoje().split('-');
+  const [ano, mes, dia] = plantaoDiaSelecionado.split('-');
+  const diasSemana = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+  const nomeDia = diasSemana[new Date(plantaoDiaSelecionado + 'T12:00:00').getDay()];
+
   let html = `
     <div style="margin-bottom:1.25rem">
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
-        <div>
-          <div style="font-size:13px;color:#555;margin-bottom:2px">PLANTÃO DO DIA — ${dia}/${mes}/${ano}</div>
-          <div style="font-size:14px;color:#888">${feitos} de ${itens.length} itens concluídos</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <button onclick="navPlantao(-1)" style="background:none;border:1px solid #333;color:#aaa;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:16px">‹</button>
+          <div>
+            <div style="font-size:13px;color:#555;margin-bottom:2px">PLANTÃO — ${nomeDia}, ${dia}/${mes}/${ano}${ehHoje ? ' <span style="color:#C9A84C;font-size:11px">HOJE</span>' : ''}</div>
+            <div style="font-size:14px;color:#888">${feitos} de ${itens.length} itens concluídos</div>
+          </div>
+          <button onclick="navPlantao(1)" style="background:none;border:1px solid #333;color:${ehHoje ? '#333' : '#aaa'};border-radius:6px;padding:4px 10px;cursor:pointer;font-size:16px" ${ehHoje ? 'disabled' : ''}>›</button>
         </div>
         <div style="display:flex;align-items:center;gap:10px">
           <div class="rotina-barra-wrap" style="width:120px"><div class="rotina-barra" style="width:${pct}%"></div></div>
           <span style="font-size:14px;color:#888">${pct}%</span>
-          ${isCeo ? `<button class="btn-nova" style="margin:0;padding:8px 16px;font-size:14px" onclick="abrirModalPlantao(null)">+ Item</button>` : ''}
+          ${isCeo && ehHoje ? `<button class="btn-nova" style="margin:0;padding:8px 16px;font-size:14px" onclick="abrirModalPlantao(null)">+ Item</button>` : ''}
         </div>
       </div>
-      ${isCeo ? `<div style="font-size:12px;color:#444;margin-top:8px">CEO: clique ✎ para editar, × para remover.</div>` : ''}
+      ${!ehHoje ? `<div style="font-size:12px;color:#666;margin-top:8px;padding:6px 10px;background:#1a1a1a;border-radius:6px">Visualização retroativa — somente leitura</div>` : ''}
+      ${isCeo && ehHoje ? `<div style="font-size:12px;color:#444;margin-top:8px">CEO: clique ✎ para editar, × para remover.</div>` : ''}
     </div>
     <div>
       ${itens.length === 0
         ? '<div class="vazio">Nenhum item de plantão cadastrado.</div>'
-        : renderGruposPlantao(itens, plantaoHoje, isCeo)}
+        : renderGruposPlantao(itens, plantaoHoje, isCeo && ehHoje)}
     </div>`;
 
   document.getElementById('conteudo').innerHTML = html;

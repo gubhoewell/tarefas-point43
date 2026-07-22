@@ -1247,9 +1247,10 @@ function renderRotina() {
       <span class="rotina-progresso">${feitos} de ${itens.length} concluídas hoje</span>
       <div class="rotina-barra-wrap"><div class="rotina-barra" style="width:${pct}%"></div></div>
       <span class="rotina-progresso">${pct}%</span>
+      <button class="btn-nova" style="margin:0;padding:6px 14px;font-size:13px" onclick="abrirModalRotina('${usuarioAtual}', null)">+ Adicionar</button>
     </div>
     <div class="rotina-lista" data-userid="${usuarioAtual}">
-    ${renderGruposRotina(itens, usuarioAtual, statusHoje, false, true)}
+    ${renderGruposRotina(itens, usuarioAtual, statusHoje, true, true)}
     </div>`;
   document.getElementById('conteudo').innerHTML = html;
 }

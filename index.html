@@ -1248,6 +1248,10 @@ function renderRotina() {
       <div class="rotina-barra-wrap"><div class="rotina-barra" style="width:${pct}%"></div></div>
       <span class="rotina-progresso">${pct}%</span>
       <button class="btn-nova" style="margin:0;padding:6px 14px;font-size:13px" onclick="abrirModalRotina('${usuarioAtual}', null)">+ Adicionar</button>
+      <button onclick="mostrarTodasRotinas=!mostrarTodasRotinas;renderConteudo()"
+        style="background:${mostrarTodasRotinas?'#2a2200':'none'};border:1px solid ${mostrarTodasRotinas?'#c9a84c':'#333'};color:${mostrarTodasRotinas?'#c9a84c':'#888'};border-radius:6px;padding:6px 12px;cursor:pointer;font-size:13px">
+        ${mostrarTodasRotinas ? '📅 Todos os dias' : '📅 Ver outros dias'}
+      </button>
     </div>
     <div class="rotina-lista" data-userid="${usuarioAtual}">
     ${renderGruposRotina(itens, usuarioAtual, statusHoje, true, true)}

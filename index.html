@@ -640,6 +640,8 @@ const REF_CONFIG = DB.ref('rotinas_config');
 const REF_PONTO = DB.ref('ponto');
 const REF_PLANTAO_CONFIG = DB.ref('plantao_config');
 const REF_PLANTAO = DB.ref('plantao');
+const REF_PLANTAO_GRUPOS = DB.ref('plantao_grupos');
+const REF_PLANTAO_TEMPO = DB.ref('plantao_tempo');
 
 // Seed do Plantão — 26 itens consolidados sem duplicatas
 const PLANTAO_SEED = [
@@ -737,6 +739,9 @@ let rotinaHoje = {};
 let rotinasConfig = {};
 let plantaoConfig = {};
 let plantaoHoje = {};
+let plantaoGrupos = {};
+let plantaoTempo = {};
+let timerInterval = null;
 let plantaoDiaSelecionado = hoje(); // data navegável do plantão
 let tabAtiva = 'minhas';
 let pontoHoje = {};
@@ -816,9 +821,13 @@ function renderTabs() {
 }
 
 function mudarTab(id) {
+  if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
   tabAtiva = id;
   renderTabs();
   renderConteudo();
+  if (id === 'plantao') {
+    timerInterval = setInterval(tickTimers, 1000);
+  }
 }
 
 // ── FIREBASE ──
@@ -878,8 +887,16 @@ function escutarTarefas() {
     }
     if (tabAtiva === 'plantao') renderConteudo();
   });
+  REF_PLANTAO_GRUPOS.on('value', snap => {
+    plantaoGrupos = snap.val() || {};
+    if (tabAtiva === 'plantao') renderConteudo();
+  });
   REF_PLANTAO.child(plantaoDiaSelecionado).on('value', snap => {
     plantaoHoje = snap.val() || {};
+    if (tabAtiva === 'plantao') renderConteudo();
+  });
+  REF_PLANTAO_TEMPO.child(plantaoDiaSelecionado).on('value', snap => {
+    plantaoTempo = snap.val() || {};
     if (tabAtiva === 'plantao') renderConteudo();
   });
 }
@@ -1035,20 +1052,95 @@ function renderItemPlantao(item, statusHoje, isCeo, dentroGrupo = false) {
     </div>`;
 }
 
+function fmtTempo(segundos) {
+  const h = Math.floor(segundos / 3600);
+  const m = Math.floor((segundos % 3600) / 60);
+  const s = segundos % 60;
+  if (h > 0) return `${h}h${String(m).padStart(2,'0')}min`;
+  return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+function timerSegundos(grupoNome) {
+  const t = plantaoTempo[grupoNome];
+  if (!t) return 0;
+  const elapsed = t.elapsed || 0;
+  if (t.inicio && !t.pausado) {
+    return elapsed + Math.floor((Date.now() - t.inicio) / 1000);
+  }
+  return elapsed;
+}
+
+function iniciarTimer(grupoNome) {
+  const t = plantaoTempo[grupoNome] || {};
+  const elapsed = t.elapsed || 0;
+  REF_PLANTAO_TEMPO.child(plantaoDiaSelecionado).child(grupoNome).update({
+    inicio: Date.now(), elapsed, pausado: false
+  });
+}
+
+function pausarTimer(grupoNome) {
+  const segundos = timerSegundos(grupoNome);
+  REF_PLANTAO_TEMPO.child(plantaoDiaSelecionado).child(grupoNome).update({
+    inicio: null, elapsed: segundos, pausado: true
+  });
+}
+
+function tickTimers() {
+  if (tabAtiva !== 'plantao') return;
+  // atualiza só os displays dos timers ativos sem re-renderizar tudo
+  document.querySelectorAll('[data-timer-grupo]').forEach(el => {
+    const g = el.dataset.timerGrupo;
+    el.textContent = fmtTempo(timerSegundos(g));
+  });
+}
+
 function renderGruposPlantao(itens, statusHoje, isCeo) {
   const slots = buildSlots(itens);
   let html = '';
+  // ordenar grupos pelo plantaoGrupos.ordem
+  const grupoOrdem = (nome) => (plantaoGrupos[nome]?.ordem ?? 99);
+  slots.sort((a, b) => {
+    const na = a.type === 'grupo' ? a.nome : (a.item?.grupo || '');
+    const nb = b.type === 'grupo' ? b.nome : (b.item?.grupo || '');
+    return grupoOrdem(na) - grupoOrdem(nb);
+  });
+
   for (const slot of slots) {
     if (slot.type === 'item') {
       html += renderItemPlantao(slot.item, statusHoje, isCeo);
     } else {
       const feitosGrupo = slot.itens.filter(i => statusHoje[i.id]).length;
       const completo = feitosGrupo === slot.itens.length;
+      const cfg = plantaoGrupos[slot.nome] || {};
+      const horario = cfg.horario || '';
+      const temTimer = cfg.timer !== false;
+      const t = plantaoTempo[slot.nome];
+      const timerAtivo = t && !t.pausado && t.inicio;
+      const timerSecs = timerSegundos(slot.nome);
+      const timerFeito = t && t.concluido;
+
+      let timerHtml = '';
+      if (temTimer && isCeo) {
+        if (timerFeito) {
+          timerHtml = `<span style="font-size:11px;color:#5a9e5a">✓ ${fmtTempo(t.elapsed || 0)}</span>`;
+        } else if (timerAtivo) {
+          timerHtml = `
+            <span data-timer-grupo="${slot.nome}" style="font-size:12px;color:#c9a84c;min-width:50px;text-align:right">${fmtTempo(timerSecs)}</span>
+            <button onclick="event.stopPropagation();pausarTimer('${slot.nome}')" style="background:#2a2a2a;border:none;color:#aaa;border-radius:4px;padding:2px 7px;cursor:pointer;font-size:12px">⏸</button>`;
+        } else {
+          timerHtml = `
+            ${timerSecs > 0 ? `<span style="font-size:12px;color:#666">${fmtTempo(timerSecs)}</span>` : ''}
+            <button onclick="event.stopPropagation();iniciarTimer('${slot.nome}')" style="background:#1a2a1a;border:1px solid #3a5a3a;color:#5a9e5a;border-radius:4px;padding:2px 8px;cursor:pointer;font-size:12px">▶</button>`;
+        }
+      }
+
       html += `
         <details class="rotina-grupo" ${completo ? '' : 'open'}>
-          <summary class="rotina-grupo-header">
-            <span class="rotina-grupo-nome">${slot.nome}</span>
-            <span class="rotina-grupo-pct ${completo ? 'completo' : ''}">${feitosGrupo}/${slot.itens.length}${completo ? ' ✓' : ''}</span>
+          <summary class="rotina-grupo-header" style="display:flex;align-items:center;gap:8px">
+            <span class="rotina-grupo-nome" style="flex:1">${slot.nome}</span>
+            ${horario ? `<span style="font-size:11px;color:#666;white-space:nowrap">${horario}</span>` : ''}
+            ${timerHtml}
+            <span class="rotina-grupo-pct ${completo ? 'completo' : ''}" style="white-space:nowrap">${feitosGrupo}/${slot.itens.length}${completo ? ' ✓' : ''}</span>
           </summary>
           <div>
             ${slot.itens.map(i => renderItemPlantao(i, statusHoje, isCeo, true)).join('')}
@@ -1065,9 +1157,14 @@ function navPlantao(delta) {
   const nova = d.toISOString().slice(0, 10);
   if (nova > hoje()) return;
   REF_PLANTAO.child(plantaoDiaSelecionado).off('value');
+  REF_PLANTAO_TEMPO.child(plantaoDiaSelecionado).off('value');
   plantaoDiaSelecionado = nova;
   REF_PLANTAO.child(plantaoDiaSelecionado).on('value', snap => {
     plantaoHoje = snap.val() || {};
+    if (tabAtiva === 'plantao') renderConteudo();
+  });
+  REF_PLANTAO_TEMPO.child(plantaoDiaSelecionado).on('value', snap => {
+    plantaoTempo = snap.val() || {};
     if (tabAtiva === 'plantao') renderConteudo();
   });
 }

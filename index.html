@@ -642,6 +642,7 @@ const REF_PLANTAO_CONFIG = DB.ref('plantao_config');
 const REF_PLANTAO = DB.ref('plantao');
 const REF_PLANTAO_GRUPOS = DB.ref('plantao_grupos');
 const REF_PLANTAO_TEMPO = DB.ref('plantao_tempo');
+const REF_ROTINA_TEMPO = DB.ref('rotina_tempo');
 
 // Seed do Plantão — 26 itens consolidados sem duplicatas
 const PLANTAO_SEED = [
@@ -741,6 +742,7 @@ let plantaoConfig = {};
 let plantaoHoje = {};
 let plantaoGrupos = {};
 let plantaoTempo = {};
+let rotinaTempoHoje = {};
 let timerInterval = null;
 let plantaoDiaSelecionado = hoje(); // data navegável do plantão
 let tabAtiva = 'minhas';
@@ -825,7 +827,7 @@ function mudarTab(id) {
   tabAtiva = id;
   renderTabs();
   renderConteudo();
-  if (id === 'plantao') {
+  if (id === 'plantao' || id === 'rotina') {
     timerInterval = setInterval(tickTimers, 1000);
   }
 }
@@ -898,6 +900,10 @@ function escutarTarefas() {
   REF_PLANTAO_TEMPO.child(plantaoDiaSelecionado).on('value', snap => {
     plantaoTempo = snap.val() || {};
     if (tabAtiva === 'plantao') renderConteudo();
+  });
+  REF_ROTINA_TEMPO.child(hoje()).on('value', snap => {
+    rotinaTempoHoje = snap.val() || {};
+    if (tabAtiva === 'rotina') renderConteudo();
   });
 }
 
@@ -1085,12 +1091,35 @@ function pausarTimer(grupoNome) {
   });
 }
 
+function rotinaTimerSec(userId, grupoNome) {
+  const t = rotinaTempoHoje[userId]?.[grupoNome];
+  if (!t) return 0;
+  const elapsed = t.elapsed || 0;
+  if (t.inicio && !t.pausado) return elapsed + Math.floor((Date.now() - t.inicio) / 1000);
+  return elapsed;
+}
+
+function iniciarRotinaTimer(userId, grupoNome) {
+  const t = rotinaTempoHoje[userId]?.[grupoNome] || {};
+  REF_ROTINA_TEMPO.child(hoje()).child(userId).child(grupoNome).update({
+    inicio: Date.now(), elapsed: t.elapsed || 0, pausado: false
+  });
+}
+
+function pausarRotinaTimer(userId, grupoNome) {
+  const segundos = rotinaTimerSec(userId, grupoNome);
+  REF_ROTINA_TEMPO.child(hoje()).child(userId).child(grupoNome).update({
+    inicio: null, elapsed: segundos, pausado: true
+  });
+}
+
 function tickTimers() {
-  if (tabAtiva !== 'plantao') return;
-  // atualiza só os displays dos timers ativos sem re-renderizar tudo
+  if (tabAtiva !== 'plantao' && tabAtiva !== 'rotina') return;
   document.querySelectorAll('[data-timer-grupo]').forEach(el => {
     const g = el.dataset.timerGrupo;
-    el.textContent = fmtTempo(timerSegundos(g));
+    const u = el.dataset.timerUser;
+    const secs = u ? rotinaTimerSec(u, g) : timerSegundos(g);
+    el.textContent = fmtTempo(secs);
   });
 }
 
@@ -1257,11 +1286,25 @@ function renderGruposRotina(itens, userId, statusHoje, isCeo, draggable = true) 
       const completo = feitosGrupo === slot.itens.length;
       const dragGrupoAttrs = draggable ? `draggable="true" data-grupo="${slot.nome}" data-userid="${userId}" data-dragtype="grupo"
         ondragstart="dragStartGrupo(event)" ondragover="dragOverGrupo(event)" ondrop="dragDropGrupo(event)" ondragend="dragEnd(event)"` : '';
+      const rt = rotinaTempoHoje[userId]?.[slot.nome];
+      const rtAtivo = rt && !rt.pausado && rt.inicio;
+      const rtSecs = rotinaTimerSec(userId, slot.nome);
+      let rotinaTimerHtml = '';
+      if (rtAtivo) {
+        rotinaTimerHtml = `
+          <span data-timer-grupo="${slot.nome}" data-timer-user="${userId}" style="font-size:12px;color:#c9a84c;min-width:50px;text-align:right">${fmtTempo(rtSecs)}</span>
+          <button onclick="event.stopPropagation();pausarRotinaTimer('${userId}','${slot.nome}')" style="background:#2a2a2a;border:none;color:#aaa;border-radius:4px;padding:2px 7px;cursor:pointer;font-size:12px">⏸</button>`;
+      } else {
+        rotinaTimerHtml = `
+          ${rtSecs > 0 ? `<span style="font-size:12px;color:#666">${fmtTempo(rtSecs)}</span>` : ''}
+          <button onclick="event.stopPropagation();iniciarRotinaTimer('${userId}','${slot.nome}')" style="background:#1a2a1a;border:1px solid #3a5a3a;color:#5a9e5a;border-radius:4px;padding:2px 8px;cursor:pointer;font-size:12px">▶</button>`;
+      }
       html += `
         <details class="rotina-grupo" ${completo ? '' : 'open'} ${dragGrupoAttrs}>
-          <summary class="rotina-grupo-header">
+          <summary class="rotina-grupo-header" style="display:flex;align-items:center;gap:8px">
             ${draggable ? `<span class="drag-handle" title="Arrastar grupo">⠿</span>` : ''}
-            <span class="rotina-grupo-nome">${slot.nome}</span>
+            <span class="rotina-grupo-nome" style="flex:1">${slot.nome}</span>
+            ${rotinaTimerHtml}
             <span class="rotina-grupo-pct ${completo ? 'completo' : ''}">${feitosGrupo}/${slot.itens.length}${completo ? ' ✓' : ''}</span>
           </summary>
           <div class="rotina-grupo-itens" data-grupo="${slot.nome}" data-userid="${userId}">

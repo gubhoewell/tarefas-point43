@@ -1120,7 +1120,7 @@ function renderGruposPlantao(itens, statusHoje, isCeo) {
       const timerFeito = t && t.concluido;
 
       let timerHtml = '';
-      if (temTimer && isCeo) {
+      if (temTimer) {
         if (timerFeito) {
           timerHtml = `<span style="font-size:11px;color:#5a9e5a">✓ ${fmtTempo(t.elapsed || 0)}</span>`;
         } else if (timerAtivo) {

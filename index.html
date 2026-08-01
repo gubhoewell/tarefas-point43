@@ -813,7 +813,7 @@ function renderTabs() {
   const tabs = [
     { id: 'minhas', label: `Minhas tarefas${badge}` },
     ...(temRotina || u.gestor ? [{ id: 'rotina', label: 'Rotina diária' }] : []),
-    { id: 'plantao', label: '🔄 Plantão' },
+    ...(usuarioAtual !== 'raquel' ? [{ id: 'plantao', label: '🔄 Plantão' }] : []),
     { id: 'geral', label: 'Visão geral' },
     { id: 'ponto', label: 'Ponto' },
   ];

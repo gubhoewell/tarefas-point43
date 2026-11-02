@@ -25,6 +25,12 @@
     padding: 2rem;
   }
 
+  .login-form { width: 100%; max-width: 340px; display: flex; flex-direction: column; gap: 12px; }
+  .login-form input { background: #1a1a1a; border: 1px solid #333; color: #fff; border-radius: 10px; padding: 14px 16px; font-size: 17px; }
+  .login-form input:focus { outline: none; border-color: #c9a84c; }
+  .login-form button { background: #c9a84c; color: #111; border: none; border-radius: 10px; padding: 14px; font-size: 17px; font-weight: 700; cursor: pointer; }
+  .login-form button:disabled { opacity: .6; }
+  .login-erro { color: #ff7b7b; font-size: 14px; min-height: 18px; text-align: center; }
   .logo {
     font-size: 13px;
     letter-spacing: 0.15em;
@@ -519,7 +525,13 @@
 <div id="tela-selecao">
   <div class="logo">POINT 43</div>
   <div class="logo-titulo">Gestão de Tarefas</div>
-  <div class="grid-usuarios" id="grid-usuarios"></div>
+  <form class="login-form" id="login-form" onsubmit="fazerLogin(event)">
+    <input type="email" id="login-email" placeholder="E-mail" autocomplete="username" required>
+    <input type="password" id="login-senha" placeholder="Senha" autocomplete="current-password" required>
+    <div class="login-erro" id="login-erro"></div>
+    <button type="submit" id="login-btn">Entrar</button>
+    <a href="#" id="login-reset" onclick="esqueciSenha(event)" style="color:#c9a84c;font-size:14px;text-align:center;text-decoration:none;">Esqueci ou quero trocar a senha</a>
+  </form>
 </div>
 
 <!-- APP -->
@@ -532,7 +544,7 @@
         <div class="header-cargo" id="h-cargo"></div>
       </div>
     </div>
-    <button class="btn-trocar" onclick="trocarUsuario()">← Trocar</button>
+    <button class="btn-trocar" onclick="sair()">Sair</button>
   </header>
 
   <div class="tabs" id="tabs"></div>
@@ -621,6 +633,7 @@
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script>
 const FIREBASE_CONFIG = {
   apiKey:            "AIzaSyCopQnYtHCog6SsjxqnVu2PR7L7VcbF4Yw",
@@ -634,6 +647,8 @@ const FIREBASE_CONFIG = {
 
 firebase.initializeApp(FIREBASE_CONFIG);
 const DB = firebase.database();
+const AUTH = firebase.auth();
+let PERFIL = null;
 const REF = DB.ref('tarefas');
 const REF_ROTINA = DB.ref('rotina');
 const REF_CONFIG = DB.ref('rotinas_config');
@@ -780,8 +795,9 @@ function renderSelecao() {
 }
 
 function entrar(id) {
+  if (!PERFIL) return;
+  if (id !== PERFIL.usuarioId && !(usuario(PERFIL.usuarioId) || {}).gestor) return;
   usuarioAtual = id;
-  localStorage.setItem('p43_usuario', id);
   document.getElementById('tela-selecao').style.display = 'none';
   document.getElementById('app').style.display = 'block';
   const u = usuario(id);
@@ -792,12 +808,66 @@ function entrar(id) {
   escutarTarefas();
 }
 
-function trocarUsuario() {
-  localStorage.removeItem('p43_usuario');
+function sair() {
+  AUTH.signOut();
+}
+
+function mostrarLogin(msg) {
   usuarioAtual = null;
+  PERFIL = null;
   document.getElementById('app').style.display = 'none';
   document.getElementById('tela-selecao').style.display = 'flex';
+  document.getElementById('login-erro').textContent = msg || '';
+  document.getElementById('login-btn').disabled = false;
 }
+
+async function fazerLogin(ev) {
+  ev.preventDefault();
+  const btn = document.getElementById('login-btn');
+  const erro = document.getElementById('login-erro');
+  btn.disabled = true;
+  erro.textContent = '';
+  try {
+    await AUTH.signInWithEmailAndPassword(
+      document.getElementById('login-email').value.trim(),
+      document.getElementById('login-senha').value
+    );
+  } catch (e) {
+    erro.textContent = 'E-mail ou senha incorretos.';
+    btn.disabled = false;
+  }
+}
+
+async function esqueciSenha(ev) {
+  ev.preventDefault();
+  const email = document.getElementById('login-email').value.trim();
+  const erro = document.getElementById('login-erro');
+  if (!email) { erro.textContent = 'Digite seu e-mail e clique de novo.'; return; }
+  try {
+    await AUTH.sendPasswordResetEmail(email);
+  } catch (e) {}
+  erro.style.color = '#9be29b';
+  erro.textContent = 'Se o e-mail estiver cadastrado, você recebe um link pra criar a senha.';
+}
+
+AUTH.onAuthStateChanged(async user => {
+  if (!user) { mostrarLogin(); return; }
+  try {
+    const snap = await DB.ref('perfis/' + user.uid).once('value');
+    const perfil = snap.val();
+    if (!perfil || !usuario(perfil.usuarioId)) {
+      await AUTH.signOut();
+      mostrarLogin('Sem acesso. Fale com o Gustavo.');
+      return;
+    }
+    PERFIL = perfil;
+    document.getElementById('login-senha').value = '';
+    entrar(perfil.usuarioId);
+  } catch (e) {
+    await AUTH.signOut();
+    mostrarLogin('Não foi possível entrar. Tente de novo.');
+  }
+});
 
 // ── TABS ──
 function contarAguardando() {
@@ -2259,10 +2329,7 @@ function salvarTarefa() {
 }
 
 // ── INIT ──
-renderSelecao();
-
-const salvo = localStorage.getItem('p43_usuario');
-if (salvo && USUARIOS.find(u => u.id === salvo)) entrar(salvo);
+// A entrada agora é pelo login (AUTH.onAuthStateChanged).
 
 document.getElementById('overlay').addEventListener('click', e => {
   if (e.target === document.getElementById('overlay')) fecharModal();
